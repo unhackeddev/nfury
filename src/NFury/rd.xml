@@ -1,0 +1,13 @@
+﻿<Directives xmlns="http://schemas.microsoft.com/netfx/2013/01/metadata">
+	<Application>
+		<Assembly Name="NFury" Dynamic="Required All"/>
+		<Assembly Name="Spectre.Console.Cli" Dynamic="Required All"/>
+		<Assembly Name="Spectre.Console" Dynamic="Required All"/>
+		<Assembly Name="System.Threading.ThreadPool">
+			<Type Name="System.Threading.ThreadPool" Dynamic="Required All" />
+		</Assembly>
+		<Assembly Name="System.Threading">
+			<Type Name="System.Threading.Monitor" Dynamic="Required All" />
+		</Assembly>
+	</Application>
+</Directives>

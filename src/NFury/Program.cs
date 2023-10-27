@@ -1,8 +1,7 @@
-﻿using System.Reflection;
-using NFury.Commands;
+﻿using NFury.Commands.Run;
 using Spectre.Console;
 using Spectre.Console.Cli;
-using Spectre.Console.Rendering;
+using System.Reflection;
 
 WriteCopyrigth();
 
@@ -28,16 +27,16 @@ static void WriteCopyrigth()
     grid.AddColumn();
     grid.AddColumn();
     
-    grid.AddRow(new IRenderable[]
-    {
+    grid.AddRow(
+    [
         new Text("Developed by: ", new Style(Color.Red, Color.Default)).LeftJustified(),
         new Text("Unhacked, 2023", new Style(Color.Red, Color.Default)).LeftJustified()
-    });
-    grid.AddRow(new IRenderable[]
-    {
+    ]);
+    grid.AddRow(
+    [
         new Text("Version: ", new Style(Color.Red, Color.Default)).LeftJustified(),
         new Text($"{Assembly.GetEntryAssembly()?.GetName().Version}", new Style(Color.Red, Color.Default)).LeftJustified()
-    });
+    ]);
     AnsiConsole.Write(grid);
     AnsiConsole.WriteLine();
 }

@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "NFury": {
+      "commandName": "Project",
+      "commandLineArgs": "run -u 100 -r 5000 http://localhost:5205/todos"
+    }
+  }
+}
