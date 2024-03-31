@@ -2,6 +2,7 @@ using Spectre.Console;
 using Spectre.Console.Cli;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Text;
 
 namespace NFury.Commands.Run;
 
@@ -12,36 +13,70 @@ public class RunCommand : AsyncCommand<RunSettings>
 
     public override async Task<int> ExecuteAsync(CommandContext context, RunSettings settings)
     {
-        List<Task> tasks = new(settings.VirtualUsers);
+        List<Task> tasks = new(settings.Users);
         long totalElapsedTime = 0;
-        double progress = 1 / (double)settings.Requests * 100;
+        double progress = 0;
 
         AnsiConsole.Write(new Markup("[bold green]Initializing the test...[/]"));
 
-        using var httpClient = new HttpClient();
+        using var httpClient = GenrateHttpClient(settings.Insecure);
         {
-            for (var i = 0; i < settings.VirtualUsers; i++)
+            if (settings.Duration.HasValue)
             {
-                tasks.Add(SendRequests(settings.Url!, settings.Method!, httpClient, settings.Requests / settings.VirtualUsers, progress));
-            }
+                await AnsiConsole.Progress()
+                    .AutoRefresh(true)
+                    .AutoClear(true)
+                     .Columns(
+                        [
+                            new TaskDescriptionColumn(),
+                            new ProgressBarColumn(),
+                            new PercentageColumn(),
+                            new ElapsedTimeColumn(),
+                            new SpinnerColumn(),
+                        ])
+                    .StartAsync(async ctx =>
+                    {
+                        _task = ctx.AddTask("[green]Testing...[/]");
+                        var startTime = Stopwatch.GetTimestamp();
+                        var stopTime = DateTime.Now.AddSeconds(settings.Duration.Value);
+                        _task.MaxValue = (double)settings.Duration.Value;
+                        progress = 1 / ((double)settings.Duration.Value * 500) / (double)settings.Users * 100;
+                        for (var i = 0; i < settings.Users; i++)
+                        {
+                            tasks.Add(RunUserForDurationTasks(httpClient, progress, CreateRequest(settings), stopTime));
+                        }
 
-            await AnsiConsole.Progress()
-                .AutoRefresh(true)
-                .AutoClear(true)
-                 .Columns(
-                    [
-                        new TaskDescriptionColumn(),
-                        new ProgressBarColumn(),
-                        new PercentageColumn(),
-                        new SpinnerColumn(),
-                    ])
-                .StartAsync(async ctx =>
+                        await Task.WhenAll(tasks);
+                        totalElapsedTime = Stopwatch.GetElapsedTime(startTime).Ticks / 10000L;
+                    });
+            }
+            else
+            {
+                progress = 1 / (double)settings.Requests * 100;
+                var request = CreateRequest(settings);
+                for (var i = 0; i < settings.Users; i++)
                 {
-                    _task = ctx.AddTask("[green]Testing...[/]");
-                    var startTime = Stopwatch.GetTimestamp();
-                    await Task.WhenAll(tasks);
-                    totalElapsedTime = Stopwatch.GetElapsedTime(startTime).Ticks / 10000L;
-                });
+                    tasks.Add(RunUserForExecutionTasks(httpClient, progress, CreateRequest(settings)));
+                }
+
+                await AnsiConsole.Progress()
+                    .AutoRefresh(true)
+                    .AutoClear(true)
+                     .Columns(
+                        [
+                            new TaskDescriptionColumn(),
+                            new ProgressBarColumn(),
+                            new PercentageColumn(),
+                            new SpinnerColumn(),
+                        ])
+                    .StartAsync(async ctx =>
+                    {
+                        _task = ctx.AddTask("[green]Testing...[/]");
+                        var startTime = Stopwatch.GetTimestamp();
+                        await Task.WhenAll(tasks);
+                        totalElapsedTime = Stopwatch.GetElapsedTime(startTime).Ticks / 10000L;
+                    });
+            }
         }
 
         ShowResults(settings, totalElapsedTime);
@@ -49,20 +84,59 @@ public class RunCommand : AsyncCommand<RunSettings>
         return await Task.FromResult(0);
     }
 
-    private async Task SendRequests(string url, string method, HttpClient client,
-        int numberOfRequests, double progress)
+    private static HttpClient GenrateHttpClient(bool? insecure)
     {
-        for (int i = 0; i < numberOfRequests; i++)
+        if (insecure.HasValue)
         {
-            using var request = new HttpRequestMessage(GetMethod(method), url);
-            var startTime = Stopwatch.GetTimestamp();
-            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
-            long elapsedMilliseconds = Stopwatch.GetElapsedTime(startTime).Ticks / 10000L;
-            _responses.Add(new Response(Guid.NewGuid(), elapsedMilliseconds, response.StatusCode));
+            var handler = new HttpClientHandler();
+            handler.ClientCertificateOptions = ClientCertificateOption.Manual;
+            handler.ServerCertificateCustomValidationCallback =
+                (httpRequestMessage, cert, cetChain, policyErrors) =>
+                {
+                    return true;
+                };
+            return new HttpClient(handler);
+        }
+        
+        return new HttpClient();
+    }
+
+    private async Task RunUserForDurationTasks(HttpClient client, double progress, Request request, DateTime stopTime)
+    {
+        while (DateTime.Now < stopTime)
+        {
+            await SendRequests(client, request);
             _task?.Increment(progress);
         }
     }
+    private async Task RunUserForExecutionTasks(HttpClient client, double progress, Request request)
+    {
+        for (int i = 0; i < request.NumberOfRequests; i++)
+        {
+            await SendRequests(client, request);
+            _task?.Increment(progress);
+        }
+    }
+    private static Request CreateRequest(RunSettings settings)
+    {
+        return new Request(settings.Url!, settings.Method!, settings?.Body, settings?.ContentType, settings!.Requests / settings.Users);
+    }
+    private async Task SendRequests(HttpClient client, Request request)
+    {
+        using var httpRequest = GenerateHttpRequest(request);
+        var startTime = Stopwatch.GetTimestamp();
+        using var response = await client.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+        long elapsedMilliseconds = Stopwatch.GetElapsedTime(startTime).Ticks / 10000L;
+        _responses.Add(new Response(Guid.NewGuid(), elapsedMilliseconds, response.StatusCode));
+    }
+    private static HttpRequestMessage GenerateHttpRequest(Request request)
+    {
+        var httpRequest = new HttpRequestMessage(GetMethod(request.Method), request.Url);
+        if (!string.IsNullOrWhiteSpace(request.Body))
+            httpRequest.Content = new StringContent(request.Body, Encoding.UTF8, request.ContentType!);
 
+        return httpRequest;
+    }
     private void ShowResults(RunSettings settings, long totalElapsedTime)
     {
         long totalTime = _responses.Sum(p => p.ElapsedTime);
@@ -119,7 +193,6 @@ public class RunCommand : AsyncCommand<RunSettings>
                         .Select(p => p.ElapsedTime).ToList(), 99).ToString("F2")
                     );
         }
-       
 
         var globalResults = new Table
         {
@@ -131,7 +204,15 @@ public class RunCommand : AsyncCommand<RunSettings>
         globalResults.AddColumn(new TableColumn("Unit").Centered());
 
         globalResults.AddRow("Test duration", totalElapsedTime.ToString("F2"), "ms");
-        globalResults.AddRow("Requests", (settings.Requests / ((double)totalElapsedTime / 1000)).ToString("F1"), "req/s");
+        if (settings.Duration.HasValue)
+        {
+            globalResults.AddRow("Total Requests", _responses.Count.ToString(), "req");
+            globalResults.AddRow("Requests", (_responses.Count / ((double)totalElapsedTime / 1000)).ToString("F1"), "req/s");
+        }
+        else
+        {
+            globalResults.AddRow("Requests", (settings.Requests / ((double)totalElapsedTime / 1000)).ToString("F1"), "req/s");
+        }
         globalResults.AddRow("Avg. Response Time", averageResponseTime.ToString("F2"), "ms");
         globalResults.AddRow("Pct 50", CalculatePercentile(values, 50).ToString("F2"), "ms");
         globalResults.AddRow("Pct 75", CalculatePercentile(values, 75).ToString("F2"), "ms");
@@ -151,7 +232,6 @@ public class RunCommand : AsyncCommand<RunSettings>
             }
         }
     }
-
     private static HttpMethod GetMethod(string method)
     {
         return method.ToUpperInvariant() switch
@@ -161,7 +241,6 @@ public class RunCommand : AsyncCommand<RunSettings>
             _ => throw new ArgumentOutOfRangeException(nameof(method), method, null)
         };
     }
-
     private static long CalculatePercentile(List<long> values, int percentile)
     {
         values.Sort();
@@ -173,7 +252,7 @@ public class RunCommand : AsyncCommand<RunSettings>
 
         if (percentile is < 0 or > 100)
         {
-            throw new ArgumentOutOfRangeException("percentile", "The percentile value must be between 0 and 100.");
+            throw new ArgumentOutOfRangeException(nameof(percentile), "The percentile value must be between 0 and 100.");
         }
 
         int n = values.Count;
