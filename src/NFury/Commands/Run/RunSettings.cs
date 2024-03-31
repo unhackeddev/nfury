@@ -21,4 +21,8 @@ public class RunSettings : CommandSettings
     [CommandOption("-m|--method <METHOD>")]
     [DefaultValue("GET")]
     public string? Method { get; set; }
+
+    [CommandOption("-o|--output <OUTPUT>")]
+    [DefaultValue("Console")]
+    public string? Output { get; set; }
 }
