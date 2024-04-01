@@ -19,7 +19,7 @@ public class RunCommand : AsyncCommand<RunSettings>
 
         AnsiConsole.Write(new Markup("[bold green]Initializing the test...[/]"));
 
-        using var httpClient = GenrateHttpClient(settings.Insecure);
+        using var httpClient = GenerateHttpClient(settings.Insecure);
         {
             if (settings.Duration.HasValue)
             {
@@ -84,7 +84,7 @@ public class RunCommand : AsyncCommand<RunSettings>
         return await Task.FromResult(0);
     }
 
-    private static HttpClient GenrateHttpClient(bool? insecure)
+    private static HttpClient GenerateHttpClient(bool? insecure)
     {
         if (insecure.HasValue)
         {

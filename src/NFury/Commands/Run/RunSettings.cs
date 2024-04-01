@@ -37,7 +37,7 @@ public class RunSettings : CommandSettings
     public int? Duration { get; set; }
 
     [CommandOption("-i|--insecure")]
-    [Description("Allowing untrested SSL Certificates.")]
+    [Description("Allowing untrusted SSL Certificates.")]
     public bool? Insecure { get; set; }
 
 }
