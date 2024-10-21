@@ -30,7 +30,7 @@ static void WriteCopyrigth()
     grid.AddRow(
     [
         new Text("Developed by: ", new Style(Color.Red, Color.Default)).LeftJustified(),
-        new Text("Unhacked, 2023", new Style(Color.Red, Color.Default)).LeftJustified()
+        new Text("Unhacked, 2024", new Style(Color.Red, Color.Default)).LeftJustified()
     ]);
     grid.AddRow(
     [

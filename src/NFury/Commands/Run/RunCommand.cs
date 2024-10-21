@@ -238,6 +238,9 @@ public class RunCommand : AsyncCommand<RunSettings>
         {
             "GET" => HttpMethod.Get,
             "POST" => HttpMethod.Post,
+            "PUT" => HttpMethod.Put,
+            "DELETE" => HttpMethod.Delete,
+            "PATCH" => HttpMethod.Patch,
             _ => throw new ArgumentOutOfRangeException(nameof(method), method, null)
         };
     }
