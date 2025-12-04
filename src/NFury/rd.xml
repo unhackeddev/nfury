@@ -1,0 +1,28 @@
+﻿<Directives xmlns="http://schemas.microsoft.com/netfx/2013/01/metadata">
+	<Application>
+		<!-- NFury Application -->
+		<Assembly Name="NFury" Dynamic="Required All"/>
+		
+		<!-- Spectre.Console -->
+		<Assembly Name="Spectre.Console.Cli" Dynamic="Required All"/>
+		<Assembly Name="Spectre.Console" Dynamic="Required All"/>
+		
+		<!-- SQLite (Native AOT compatible) -->
+		<Assembly Name="Microsoft.Data.Sqlite" Dynamic="Required All"/>
+		<Assembly Name="SQLitePCLRaw.core" Dynamic="Required All"/>
+		<Assembly Name="SQLitePCLRaw.provider.e_sqlite3" Dynamic="Required All"/>
+		
+		<!-- ASP.NET Core / SignalR -->
+		<Assembly Name="Microsoft.AspNetCore.SignalR" Dynamic="Required All"/>
+		<Assembly Name="Microsoft.AspNetCore.SignalR.Core" Dynamic="Required All"/>
+		<Assembly Name="Microsoft.AspNetCore.Http.Connections" Dynamic="Required All"/>
+		
+		<!-- System Threading -->
+		<Assembly Name="System.Threading.ThreadPool">
+			<Type Name="System.Threading.ThreadPool" Dynamic="Required All" />
+		</Assembly>
+		<Assembly Name="System.Threading">
+			<Type Name="System.Threading.Monitor" Dynamic="Required All" />
+		</Assembly>
+	</Application>
+</Directives>

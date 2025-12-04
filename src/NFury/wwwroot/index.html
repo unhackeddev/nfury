@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NFury - Load Testing Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.0/dist/browser/signalr.min.js"></script>
+    <link href="css/styles.css" rel="stylesheet">
+</head>
+<body class="sidebar-open">
+    <header class="header">
+        <div class="header-left">
+            <button class="btn-sidebar-toggle" onclick="toggleSidebar()">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="logo">
+                <i class="fas fa-bolt"></i>
+                <span>NFury</span>
+            </div>
+            <div class="header-divider"></div>
+            <div class="test-info">
+                <span class="test-name" id="projectNameHeader">Quick Test</span>
+                <span class="test-subtitle">Dashboard</span>
+            </div>
+        </div>
+        <div class="header-right">
+            <span id="connectionStatus" class="connection-badge disconnected">
+                <span class="status-dot"></span>
+                <span class="status-text">Disconnected</span>
+            </span>
+            <button class="btn-theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+                <i class="fas fa-moon" id="themeIcon"></i>
+            </button>
+            <button class="btn-history" onclick="toggleHistoryPanel()">
+                <i class="fas fa-history"></i>
+                HISTORY
+            </button>
+            <button class="btn-configure" onclick="toggleConfigPanel()">
+                <i class="fas fa-bolt"></i>
+                QUICK TEST
+            </button>
+        </div>
+    </header>
+
+    <div class="test-info-bar">
+        <div class="info-item">
+            <i class="fas fa-users"></i>
+            <span id="infoUsers">10 VUs</span>
+        </div>
+        <div class="info-item">
+            <i class="fas fa-clock"></i>
+            <span id="infoDuration">--</span>
+        </div>
+        <div class="info-item">
+            <i class="fas fa-calendar"></i>
+            <span id="infoDate">--</span>
+        </div>
+        <div class="info-item status" id="testStatusBadge">
+            <span class="status-indicator idle"></span>
+            <span>Ready</span>
+        </div>
+    </div>
+
+    <aside class="sidebar open" id="sidebar">
+        <div class="sidebar-header">
+            <h3><i class="fas fa-folder-open"></i> Projects</h3>
+            <div class="sidebar-header-actions">
+                <button class="btn-import-project" onclick="showImportProjectModal()" title="Import Project">
+                    <i class="fas fa-file-import"></i>
+                </button>
+                <button class="btn-new-project" onclick="showCreateProjectModal()" title="New Project">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+        </div>
+        <div class="sidebar-body">
+            <div class="project-tree" id="projectTree">
+            </div>
+        </div>
+        <div class="sidebar-footer">
+            <div class="sidebar-stats">
+                <span><i class="fas fa-chart-line"></i> <strong id="totalExecutions">0</strong> tests run</span>
+            </div>
+        </div>
+        <div class="sidebar-resize-handle" id="sidebarResizeHandle"></div>
+    </aside>
+
+    <main class="main-content with-sidebar">
+        <aside class="config-panel" id="configPanel">
+            <div class="config-header">
+                <div class="config-title">
+                    <span class="config-name"><i class="fas fa-sliders-h"></i> Quick Test</span>
+                    <span class="config-subtitle">Test Configuration</span>
+                </div>
+                <button class="btn-close-config" onclick="toggleConfigPanel()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="config-body">
+                <form id="testForm">
+                    <div class="form-group">
+                        <label for="url">Target URL <span class="required">*</span></label>
+                        <div class="url-input-group">
+                            <select id="urlSchema" class="schema-select">
+                                <option value="https://">https://</option>
+                                <option value="http://">http://</option>
+                            </select>
+                            <input type="text" id="url" placeholder="api.example.com/endpoint" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="method">Method</label>
+                            <select id="method">
+                                <option value="GET" selected>GET</option>
+                                <option value="POST">POST</option>
+                                <option value="PUT">PUT</option>
+                                <option value="PATCH">PATCH</option>
+                                <option value="DELETE">DELETE</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="contentType">Content Type</label>
+                            <select id="contentType">
+                                <option value="application/json">JSON</option>
+                                <option value="application/xml">XML</option>
+                                <option value="text/plain">Text</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="users"><i class="fas fa-users"></i> Users</label>
+                            <input type="number" id="users" value="10" min="1" max="1000">
+                        </div>
+                        <div class="form-group">
+                            <label for="requests"><i class="fas fa-exchange-alt"></i> Requests</label>
+                            <input type="number" id="requests" value="100" min="1">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="duration"><i class="fas fa-stopwatch"></i> Duration (seconds)</label>
+                        <input type="number" id="duration" placeholder="Leave empty for request-based">
+                    </div>
+
+                    <div class="form-group" id="bodySection">
+                        <label for="body">Request Body</label>
+                        <textarea id="body" rows="3" placeholder='{"key": "value"}'></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            Headers
+                            <button type="button" class="btn-add-header" onclick="addHeader()">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </label>
+                        <div id="headersContainer"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="useAuth" onchange="toggleAuthSection()">
+                            <span class="toggle-switch"></span>
+                            <span><i class="fas fa-key"></i> Authentication</span>
+                        </label>
+                    </div>
+
+                    <div id="authSection" class="auth-section hidden">
+                        <div class="form-group">
+                            <label for="authUrl">Auth URL</label>
+                            <div class="url-input-group">
+                                <select id="authUrlSchema" class="schema-select">
+                                    <option value="https://">https://</option>
+                                    <option value="http://">http://</option>
+                                </select>
+                                <input type="text" id="authUrl" placeholder="api.example.com/auth">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="authMethod">Method</label>
+                                <select id="authMethod">
+                                    <option value="POST">POST</option>
+                                    <option value="GET">GET</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="authContentType">Content Type</label>
+                                <select id="authContentType">
+                                    <option value="application/json">JSON</option>
+                                    <option value="application/x-www-form-urlencoded">Form</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="authBody">Auth Body</label>
+                            <textarea id="authBody" rows="2" placeholder='{"username": "", "password": ""}'></textarea>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="tokenPath">Token Path</label>
+                                <input type="text" id="tokenPath" value="access_token" placeholder="access_token">
+                            </div>
+                            <div class="form-group">
+                                <label for="headerName">Header</label>
+                                <input type="text" id="headerName" value="Authorization">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="headerPrefix">Prefix</label>
+                            <input type="text" id="headerPrefix" value="Bearer ">
+                        </div>
+                        <div id="authStatus" class="auth-status-container"></div>
+                        <button type="button" class="btn-test-auth" onclick="testAuthentication()">
+                            <i class="fas fa-vial"></i> Test Auth
+                        </button>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="insecure">
+                            <span class="toggle-switch"></span>
+                            <span><i class="fas fa-unlock"></i> Allow Insecure SSL</span>
+                        </label>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn-start" id="startBtn">
+                            <i class="fas fa-play"></i> START TEST
+                        </button>
+                        <button type="button" class="btn-stop hidden" id="stopBtn" onclick="window.app.stopTest()">
+                            <i class="fas fa-stop"></i> STOP
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </aside>
+
+        <div class="dashboard">
+            <div class="performance-card">
+                <h4 class="section-title">PERFORMANCE OVERVIEW</h4>
+                <div class="metrics-grid">
+                    <div class="metric-item">
+                        <span class="metric-label">
+                            REQUESTS MADE
+                            <span class="info-tooltip" data-tooltip="Total number of HTTP requests sent to the target URL during the test. Calculated as: sum of all requests from all virtual users.">
+                                <i class="fas fa-info-circle"></i>
+                            </span>
+                        </span>
+                        <div class="metric-value">
+                            <span class="value-number" id="statTotalRequests">0</span>
+                            <span class="value-unit">reqs</span>
+                        </div>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">
+                            HTTP FAILURES
+                            <span class="info-tooltip" data-tooltip="Number of requests that returned HTTP error status codes (4xx, 5xx) or failed to connect. Calculated as: total requests - successful requests (2xx/3xx responses).">
+                                <i class="fas fa-info-circle"></i>
+                            </span>
+                        </span>
+                        <div class="metric-value error">
+                            <span class="value-number" id="statFailed">0</span>
+                            <span class="value-unit">reqs</span>
+                        </div>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">
+                            PEAK RPS
+                            <span class="info-tooltip" data-tooltip="Peak Requests Per Second - the maximum throughput achieved during the test. Calculated as: highest number of requests completed in any 1-second window.">
+                                <i class="fas fa-info-circle"></i>
+                            </span>
+                        </span>
+                        <div class="metric-value">
+                            <span class="value-number" id="statRps">0</span>
+                            <span class="value-unit">req/s</span>
+                        </div>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">
+                            AVG RESPONSE TIME
+                            <span class="info-tooltip" data-tooltip="Average Response Time - mean time for the server to respond to requests. Calculated as: sum of all response times / total requests. Lower is better.">
+                                <i class="fas fa-info-circle"></i>
+                            </span>
+                        </span>
+                        <div class="metric-value">
+                            <span class="value-number" id="statAvgResponse">0</span>
+                            <span class="value-unit">ms</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="main-chart-container">
+                    <canvas id="responseTimeChart"></canvas>
+                </div>
+            </div>
+
+            <div class="stats-bar">
+                <div class="stat-item success">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Avg response time: <strong id="avgResponseBottom">0ms</strong></span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat-item">
+                    <span>Requests: <strong id="totalRequestsBottom">0</strong></span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat-item">
+                    <span>Requests/second: <strong id="rpsBottom">0</strong></span>
+                </div>
+            </div>
+
+            <div class="charts-row">
+                <div class="chart-card">
+                    <h5 class="chart-title">Status Codes Distribution</h5>
+                    <div class="chart-container">
+                        <canvas id="statusCodeChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h5 class="chart-title">Response Time Percentiles</h5>
+                    <div class="chart-container">
+                        <canvas id="percentileChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="results-card hidden" id="resultsCard">
+                <h4 class="section-title">
+                    <i class="fas fa-flag-checkered"></i> FINAL RESULTS
+                </h4>
+                <div class="results-grid">
+                    <div class="results-section">
+                        <h5>Global Metrics</h5>
+                        <table class="results-table">
+                            <tbody id="globalResultsBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="results-section">
+                        <h5>Percentiles</h5>
+                        <table class="results-table">
+                            <thead>
+                                <tr><th>Percentile</th><th>Time</th></tr>
+                            </thead>
+                            <tbody id="percentileResultsBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="results-section full-width">
+                    <h5>Results by Status Code</h5>
+                    <div class="table-responsive">
+                        <table class="results-table">
+                            <thead>
+                                <tr>
+                                    <th>Status</th>
+                                    <th>Count</th>
+                                    <th>Min</th>
+                                    <th>Avg</th>
+                                    <th>Max</th>
+                                    <th>P50</th>
+                                    <th>P90</th>
+                                    <th>P99</th>
+                                </tr>
+                            </thead>
+                            <tbody id="statusCodeResultsBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <span>NFury Load Testing Tool</span>
+        <span class="divider">•</span>
+        <a href="https://github.com/unhackeddev" target="_blank">Developed by Unhacked</a>
+    </footer>
+
+    <aside class="history-panel" id="historyPanel">
+        <div class="history-header">
+            <h3><i class="fas fa-history"></i> Test History</h3>
+            <button class="btn-close-history" onclick="toggleHistoryPanel()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="history-body">
+            <div class="history-filters">
+                <select id="historyStatusFilter" onchange="loadHistory()">
+                    <option value="">All Status</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Failed">Failed</option>
+                    <option value="Cancelled">Cancelled</option>
+                </select>
+            </div>
+            <div class="history-list" id="historyList">
+                <div class="history-empty">
+                    <i class="fas fa-inbox"></i>
+                    <p>No test history yet</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <div class="modal" id="createProjectModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-folder-plus"></i> Create New Project</h3>
+                <button class="btn-close-modal" onclick="closeCreateProjectModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="createProjectForm">
+                    <div class="form-group">
+                        <label for="newProjectName">Project Name <span class="required">*</span></label>
+                        <input type="text" id="newProjectName" placeholder="REST API basics: CRUD, test & variable" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="newProjectDescription">Description</label>
+                        <textarea id="newProjectDescription" rows="2" placeholder="Describe your project..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeCreateProjectModal()">Cancel</button>
+                <button class="btn-primary" onclick="createProject()">
+                    <i class="fas fa-save"></i> Create Project
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="endpointModal">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h3 id="endpointModalTitle"><i class="fas fa-plus-circle"></i> Add Endpoint</h3>
+                <button class="btn-close-modal" onclick="closeEndpointModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="endpointForm">
+                    <div class="form-group">
+                        <label for="endpointName">Endpoint Name <span class="required">*</span></label>
+                        <input type="text" id="endpointName" placeholder="Get users list" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 0 0 120px;">
+                            <label for="endpointMethod">Method</label>
+                            <select id="endpointMethod">
+                                <option value="GET">GET</option>
+                                <option value="POST">POST</option>
+                                <option value="PUT">PUT</option>
+                                <option value="PATCH">PATCH</option>
+                                <option value="DELETE">DELETE</option>
+                                <option value="HEAD">HEAD</option>
+                                <option value="OPTIONS">OPTIONS</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label for="endpointUrl">URL <span class="required">*</span></label>
+                            <div class="url-input-group">
+                                <select id="endpointUrlSchema" class="schema-select">
+                                    <option value="https://">https://</option>
+                                    <option value="http://">http://</option>
+                                </select>
+                                <input type="text" id="endpointUrl" placeholder="api.example.com/users" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="endpointUsers">Concurrent Users</label>
+                            <input type="number" id="endpointUsers" value="10" min="1">
+                        </div>
+                        <div class="form-group">
+                            <label for="endpointRequests">Total Requests</label>
+                            <input type="number" id="endpointRequests" value="100" min="1">
+                        </div>
+                        <div class="form-group">
+                            <label for="endpointDuration">Duration (sec)</label>
+                            <input type="number" id="endpointDuration" placeholder="Optional" min="1">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="endpointContentType">Content Type</label>
+                            <select id="endpointContentType">
+                                <option value="application/json">JSON</option>
+                                <option value="application/xml">XML</option>
+                                <option value="text/plain">Text</option>
+                                <option value="application/x-www-form-urlencoded">Form URL Encoded</option>
+                                <option value="multipart/form-data">Multipart Form</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="endpointBody">Request Body</label>
+                        <textarea id="endpointBody" rows="4" placeholder='{"key": "value"}'></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Headers <button type="button" class="btn-add-header" onclick="addEndpointHeader()"><i class="fas fa-plus"></i></button></label>
+                        <div id="endpointHeadersContainer">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="endpointRequiresAuth">
+                            <span class="toggle-switch"></span>
+                            <span><i class="fas fa-key"></i> Requires Authentication</span>
+                        </label>
+                        <small class="form-help">If enabled, the project's authentication endpoint will be called before testing</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="endpointInsecure">
+                            <span class="toggle-switch"></span>
+                            <span><i class="fas fa-lock-open"></i> Allow Insecure SSL</span>
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeEndpointModal()">Cancel</button>
+                <button class="btn-primary" onclick="saveEndpoint()">
+                    <i class="fas fa-save"></i> Save Endpoint
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="executionModal">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h3><i class="fas fa-chart-bar"></i> Execution Details</h3>
+                <button class="btn-close-modal" onclick="closeExecutionModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="executionModalBody">
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal" id="projectAuthModal">
+        <div class="modal-content medium">
+            <div class="modal-header">
+                <h3 id="projectAuthModalTitle"><i class="fas fa-key"></i> Authentication Endpoint</h3>
+                <button class="btn-close-modal" onclick="closeAllModals()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="projectAuthForm" onsubmit="event.preventDefault(); saveProjectAuth();">
+                    <p class="auth-description">
+                        Configure an authentication endpoint that will be called before testing endpoints that require authentication. 
+                        The token from the response will be injected into the specified header.
+                    </p>
+                    
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 0 0 100px">
+                            <label for="projectAuthMethod">Method</label>
+                            <select id="projectAuthMethod">
+                                <option value="POST">POST</option>
+                                <option value="GET">GET</option>
+                                <option value="PUT">PUT</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex: 1">
+                            <label for="projectAuthUrl">Authentication URL *</label>
+                            <div class="url-input-group">
+                                <select id="projectAuthUrlSchema" class="schema-select">
+                                    <option value="https://">https://</option>
+                                    <option value="http://">http://</option>
+                                </select>
+                                <input type="text" id="projectAuthUrl" placeholder="api.example.com/auth/login" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="projectAuthContentType">Content Type</label>
+                        <select id="projectAuthContentType">
+                            <option value="application/json">application/json</option>
+                            <option value="application/x-www-form-urlencoded">application/x-www-form-urlencoded</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="projectAuthBody">Request Body</label>
+                        <textarea id="projectAuthBody" rows="4" placeholder='{"username": "user", "password": "pass"}'></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Request Headers</label>
+                        <div id="projectAuthHeadersContainer" class="headers-container"></div>
+                        <button type="button" class="btn-add-header" onclick="addProjectAuthHeader()">
+                            <i class="fas fa-plus"></i> Add Header
+                        </button>
+                    </div>
+                    
+                    <hr class="form-divider">
+                    
+                    <h4 class="form-section-title">Token Extraction</h4>
+                    
+                    <div class="form-group">
+                        <label for="projectAuthTokenPath">JSON Path to Token</label>
+                        <input type="text" id="projectAuthTokenPath" placeholder="$.token" value="$.token">
+                        <small class="form-help">Path to extract the token from the response. Examples: $.token, $.data.accessToken, $.access_token</small>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 1">
+                            <label for="projectAuthHeaderName">Header Name</label>
+                            <input type="text" id="projectAuthHeaderName" placeholder="Authorization" value="Authorization">
+                        </div>
+                        <div class="form-group" style="flex: 1">
+                            <label for="projectAuthHeaderPrefix">Header Prefix</label>
+                            <input type="text" id="projectAuthHeaderPrefix" placeholder="Bearer" value="Bearer">
+                            <small class="form-help">The token will be added as: {Prefix} {Token}</small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-danger" onclick="deleteProjectAuth()" id="btnDeleteAuth" style="margin-right: auto;">
+                    <i class="fas fa-trash"></i> Remove Auth
+                </button>
+                <button class="btn-cancel" onclick="closeAllModals()">Cancel</button>
+                <button class="btn-primary" onclick="saveProjectAuth()">
+                    <i class="fas fa-save"></i> Save
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="importProjectModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-file-import"></i> Import Project</h3>
+                <button class="btn-close" onclick="closeAllModals()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="importProjectFile">Select JSON File</label>
+                    <input type="file" id="importProjectFile" accept=".json" onchange="handleImportFileSelect(event)">
+                </div>
+                <div id="importPreview" style="display: none;">
+                    <h4 class="form-section-title">Import Preview</h4>
+                    <div class="import-preview-content">
+                        <p><strong>Project:</strong> <span id="importProjectName"></span></p>
+                        <p><strong>Endpoints:</strong> <span id="importEndpointsCount"></span></p>
+                        <p><strong>Executions:</strong> <span id="importExecutionsCount"></span></p>
+                        <p><strong>Has Authentication:</strong> <span id="importHasAuth"></span></p>
+                    </div>
+                </div>
+                <div id="importError" class="import-error" style="display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeAllModals()">Cancel</button>
+                <button class="btn-primary" onclick="importProject()" id="btnImportProject" disabled>
+                    <i class="fas fa-file-import"></i> Import
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="overlay" id="overlay" onclick="closeAllModals()"></div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

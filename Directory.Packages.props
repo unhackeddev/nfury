@@ -1,0 +1,18 @@
+<Project>
+  <!-- Central Package Management -->
+  <!-- https://learn.microsoft.com/en-us/nuget/consume-packages/central-package-management -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- CLI & Console -->
+    <PackageVersion Include="Spectre.Console" Version="0.47.1-preview.0.27" />
+    <PackageVersion Include="Spectre.Console.Cli" Version="0.47.1-preview.0.27" />
+
+    <!-- Data Access -->
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+  </ItemGroup>
+
+</Project>
