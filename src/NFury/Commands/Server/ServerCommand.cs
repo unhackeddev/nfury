@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using NFury.Web;
 using NFury.Web.Data;
 using NFury.Web.Hubs;
@@ -7,8 +8,21 @@ using Spectre.Console.Cli;
 
 namespace NFury.Commands.Server;
 
+/// <summary>
+/// Command to start the NFury web server with API endpoints and SignalR hub
+/// </summary>
 public class ServerCommand : AsyncCommand<ServerSettings>
 {
+    /// <summary>
+    /// Executes the server command, starting the web application
+    /// </summary>
+    /// <param name="context">The command context</param>
+    /// <param name="settings">The server settings including port and host</param>
+    /// <returns>Exit code (0 for success)</returns>
+    [UnconditionalSuppressMessage("AOT", "IL2026:RequiresUnreferencedCode",
+        Justification = "ASP.NET Core Minimal APIs with source-generated JSON serialization is AOT compatible")]
+    [UnconditionalSuppressMessage("AOT", "IL3050:RequiresDynamicCode",
+        Justification = "ASP.NET Core Minimal APIs with source-generated JSON serialization is AOT compatible")]
     public override async Task<int> ExecuteAsync(CommandContext context, ServerSettings settings)
     {
         AnsiConsole.MarkupLine("[bold blue]Starting NFury Web Server...[/]");

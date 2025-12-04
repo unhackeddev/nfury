@@ -1,5 +1,5 @@
-﻿using Spectre.Console.Cli;
 using System.ComponentModel;
+using Spectre.Console.Cli;
 
 namespace NFury.Commands.Run;
 
@@ -30,7 +30,7 @@ public class RunSettings : CommandSettings
     [CommandOption("-t|--content-type")]
     [DefaultValue("application/json")]
     [Description("Define the content type of request. Default is application/json.")]
-    public string? ContentType { get; set;}
+    public string? ContentType { get; set; }
 
     [CommandOption("-d|--duration")]
     [Description("Define the duration of test in seconds.")]

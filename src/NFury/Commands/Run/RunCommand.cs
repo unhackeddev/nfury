@@ -1,8 +1,8 @@
-using Spectre.Console;
-using Spectre.Console.Cli;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
+using Spectre.Console;
+using Spectre.Console.Cli;
 
 namespace NFury.Commands.Run;
 

@@ -1,8 +1,8 @@
-﻿using NFury.Commands.Run;
+using System.Reflection;
+using NFury.Commands.Run;
 using NFury.Commands.Server;
 using Spectre.Console;
 using Spectre.Console.Cli;
-using System.Reflection;
 
 WriteCopyrigth();
 

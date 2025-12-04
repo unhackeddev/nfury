@@ -1,5 +1,5 @@
-using Spectre.Console.Cli;
 using System.ComponentModel;
+using Spectre.Console.Cli;
 
 namespace NFury.Commands.Server;
 
