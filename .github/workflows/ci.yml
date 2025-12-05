@@ -12,6 +12,9 @@ on:
       - "**.md"
       - "docs/**"
 
+permissions:
+  contents: read
+
 env:
   DOTNET_VERSION: "10.0.x"
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
