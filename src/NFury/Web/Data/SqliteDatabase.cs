@@ -279,7 +279,6 @@ public class Project
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
 
-    // Authentication endpoint configuration
     public string? AuthUrl { get; set; }
     public string? AuthMethod { get; set; }
     public string? AuthContentType { get; set; }

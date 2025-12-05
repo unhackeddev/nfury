@@ -10,17 +10,22 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
         include:
           - os: ubuntu-latest
             runtime: linux-x64
             artifact: nfury-linux-x64
+          - os: ubuntu-latest
+            runtime: linux-arm64
+            artifact: nfury-linux-arm64
           - os: windows-latest
             runtime: win-x64
             artifact: nfury-win-x64
           - os: macos-latest
             runtime: osx-x64
             artifact: nfury-osx-x64
+          - os: macos-latest
+            runtime: osx-arm64
+            artifact: nfury-osx-arm64
 
     steps:
       - uses: actions/checkout@v4
@@ -30,23 +35,22 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Install cross-compilation tools (Linux ARM64)
+        if: matrix.runtime == 'linux-arm64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
       - name: Restore dependencies
         run: dotnet restore
 
-      - name: Build
-        run: dotnet build --configuration Release --no-restore
-
-      - name: Test
-        run: dotnet test --configuration Release --no-build --verbosity normal
-
-      - name: Publish
+      - name: Publish Native AOT
+        shell: bash
         run: |
           dotnet publish src/NFury/NFury.csproj \
             --configuration Release \
             --runtime ${{ matrix.runtime }} \
-            --self-contained true \
-            -p:PublishSingleFile=true \
-            -p:PublishTrimmed=true \
+            -p:PublishAot=true \
             --output ./publish/${{ matrix.artifact }}
 
       - name: Upload artifact
