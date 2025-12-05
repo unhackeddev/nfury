@@ -6,7 +6,7 @@ using Spectre.Console.Cli;
 
 WriteCopyrigth();
 
-var app = new CommandApp();
+var app = new CommandApp<ServerCommand>();
 app.Configure(config =>
 {
     config.AddCommand<RunCommand>("run")
