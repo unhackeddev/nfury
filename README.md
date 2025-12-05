@@ -87,16 +87,6 @@ Access the real-time dashboard at `http://localhost:5000` to:
 └── CHANGELOG.md                # Version history
 ```
 
-## 🧪 Testing
-
-```bash
-# Run all tests
-dotnet test
-
-# Run with coverage
-dotnet test --collect:"XPlat Code Coverage"
-```
-
 ## 🤝 Contributing
 
 Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details.
