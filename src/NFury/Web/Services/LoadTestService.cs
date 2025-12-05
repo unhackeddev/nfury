@@ -112,14 +112,25 @@ public class LoadTestService : IDisposable
     /// Extracts a token from JSON response using a dot-notation path
     /// </summary>
     /// <param name="json">The JSON response content</param>
-    /// <param name="tokenPath">The dot-notation path to the token (e.g., "access_token" or "data.token")</param>
+    /// <param name="tokenPath">The dot-notation path to the token (e.g., "$.access_token", "access_token" or "data.token")</param>
     /// <returns>The extracted token or null if not found</returns>
     private static string? ExtractToken(string json, string tokenPath)
     {
         try
         {
             using var doc = JsonDocument.Parse(json);
-            var pathParts = tokenPath.Split('.');
+
+            var cleanPath = tokenPath;
+            if (cleanPath.StartsWith("$.", StringComparison.Ordinal))
+            {
+                cleanPath = cleanPath[2..];
+            }
+            else if (cleanPath.StartsWith('$'))
+            {
+                cleanPath = cleanPath[1..];
+            }
+
+            var pathParts = cleanPath.Split('.', StringSplitOptions.RemoveEmptyEntries);
             JsonElement current = doc.RootElement;
 
             foreach (var part in pathParts)
@@ -179,6 +190,26 @@ public class LoadTestService : IDisposable
         {
             authConfig = JsonSerializer.Deserialize<AuthenticationConfig>(endpoint.AuthenticationJson, AppJsonContext.Default.AuthenticationConfig);
         }
+        else if (endpoint.RequiresAuth)
+        {
+            var project = await _projectService.GetProjectByIdAsync(endpoint.ProjectId);
+            if (project != null && !string.IsNullOrEmpty(project.AuthUrl))
+            {
+                authConfig = new AuthenticationConfig
+                {
+                    Url = project.AuthUrl,
+                    Method = project.AuthMethod ?? "POST",
+                    Body = project.AuthBody,
+                    ContentType = project.AuthContentType ?? "application/json",
+                    Headers = !string.IsNullOrEmpty(project.AuthHeadersJson)
+                        ? JsonSerializer.Deserialize<Dictionary<string, string>>(project.AuthHeadersJson, AppJsonContext.Default.DictionaryStringString)
+                        : null,
+                    TokenPath = project.AuthTokenPath ?? "$.access_token",
+                    HeaderName = project.AuthHeaderName ?? "Authorization",
+                    HeaderPrefix = project.AuthHeaderPrefix ?? "Bearer"
+                };
+            }
+        }
 
         var targetRequests = endpoint.Requests;
         var targetDuration = endpoint.Duration;
@@ -217,7 +248,12 @@ public class LoadTestService : IDisposable
                 throw new InvalidOperationException($"Authentication failed: {authResult.Error}");
             }
 
-            _authToken = $"{request.Authentication.HeaderPrefix}{authResult.Token}";
+            var prefix = request.Authentication.HeaderPrefix ?? string.Empty;
+            if (!string.IsNullOrEmpty(prefix) && !prefix.EndsWith(' '))
+            {
+                prefix += " ";
+            }
+            _authToken = $"{prefix}{authResult.Token}";
             await _hubContext.Clients.All.SendAsync("AuthenticationSuccess", new SignalRTestIdMessage { TestId = _currentTestId });
         }
 
@@ -265,7 +301,12 @@ public class LoadTestService : IDisposable
                 throw new InvalidOperationException($"Authentication failed: {authResult.Error}");
             }
 
-            _authToken = $"{request.Authentication.HeaderPrefix}{authResult.Token}";
+            var prefix = request.Authentication.HeaderPrefix ?? string.Empty;
+            if (!string.IsNullOrEmpty(prefix) && !prefix.EndsWith(' '))
+            {
+                prefix += " ";
+            }
+            _authToken = $"{prefix}{authResult.Token}";
             await _hubContext.Clients.All.SendAsync("AuthenticationSuccess", new SignalRTestIdMessage { TestId = _currentTestId });
         }
 

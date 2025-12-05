@@ -94,6 +94,64 @@ class NFuryApp {
         });
     }
 
+    showToast(type, title, message, duration = 5000) {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        
+        const icons = {
+            success: '✓',
+            error: '✕',
+            warning: '⚠',
+            info: 'ℹ'
+        };
+        
+        toast.innerHTML = `
+            <div class="toast-icon">${icons[type] || icons.info}</div>
+            <div class="toast-content">
+                <div class="toast-title">${title}</div>
+                <div class="toast-message">${message}</div>
+            </div>
+            <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+        `;
+        
+        container.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.classList.add('hiding');
+            setTimeout(() => toast.remove(), 300);
+        }, duration);
+    }
+    
+    showAlert(type, title, message) {
+        const modal = document.getElementById('alertModal');
+        const header = document.getElementById('alertModalHeader');
+        const icon = document.getElementById('alertModalIcon');
+        const titleEl = document.getElementById('alertModalTitle');
+        const messageEl = document.getElementById('alertModalMessage');
+        
+        header.className = 'alert-modal-header';
+        header.classList.add(type);
+        
+        const iconClasses = {
+            success: 'fas fa-check-circle',
+            error: 'fas fa-times-circle',
+            warning: 'fas fa-exclamation-triangle',
+            info: 'fas fa-info-circle'
+        };
+        
+        icon.className = iconClasses[type] || iconClasses.info;
+        titleEl.textContent = title;
+        messageEl.textContent = message;
+        
+        modal.classList.add('show');
+    }
+    
+    closeAlertModal() {
+        const modal = document.getElementById('alertModal');
+        modal.classList.remove('show');
+    }
+
     async loadProjects() {
         try {
             const response = await fetch('/api/projects');
@@ -254,13 +312,18 @@ class NFuryApp {
         document.getElementById('endpointUrl').value = '';
         document.getElementById('endpointMethod').value = 'GET';
         document.getElementById('endpointUsers').value = '10';
+        document.getElementById('endpointTestMode').value = 'requests';
         document.getElementById('endpointRequests').value = '100';
-        document.getElementById('endpointDuration').value = '';
+        document.getElementById('endpointDuration').value = '30';
+        this.toggleEndpointTestMode();
         document.getElementById('endpointContentType').value = 'application/json';
         document.getElementById('endpointBody').value = '';
         document.getElementById('endpointInsecure').checked = false;
         document.getElementById('endpointRequiresAuth').checked = false;
         document.getElementById('endpointHeadersContainer').innerHTML = '';
+        
+        toggleBodySource('endpoint', 'text');
+        clearBodyFile('endpoint');
         
         document.getElementById('endpointModalTitle').textContent = 'Add Endpoint';
         document.getElementById('endpointModal').classList.add('open');
@@ -279,12 +342,20 @@ class NFuryApp {
             this.setUrlWithSchema('endpointUrlSchema', 'endpointUrl', endpoint.url);
             document.getElementById('endpointMethod').value = endpoint.method || 'GET';
             document.getElementById('endpointUsers').value = endpoint.users || 10;
+            
+            const testMode = endpoint.duration ? 'duration' : 'requests';
+            document.getElementById('endpointTestMode').value = testMode;
             document.getElementById('endpointRequests').value = endpoint.requests || 100;
-            document.getElementById('endpointDuration').value = endpoint.duration || '';
+            document.getElementById('endpointDuration').value = endpoint.duration || 30;
+            this.toggleEndpointTestMode();
+            
             document.getElementById('endpointContentType').value = endpoint.contentType || 'application/json';
             document.getElementById('endpointBody').value = endpoint.body || '';
             document.getElementById('endpointInsecure').checked = endpoint.insecure || false;
             document.getElementById('endpointRequiresAuth').checked = endpoint.requiresAuth || false;
+            
+            toggleBodySource('endpoint', 'text');
+            clearBodyFile('endpoint');
             
             const headersContainer = document.getElementById('endpointHeadersContainer');
             headersContainer.innerHTML = '';
@@ -299,7 +370,7 @@ class NFuryApp {
             document.getElementById('overlay').classList.add('visible');
         } catch (err) {
             console.error('Failed to load endpoint:', err);
-            alert('Failed to load endpoint');
+            this.showAlert('error', 'Error', 'Failed to load endpoint');
         }
     }
 
@@ -308,10 +379,11 @@ class NFuryApp {
         const url = this.getFullUrl('endpointUrlSchema', 'endpointUrl');
         const method = document.getElementById('endpointMethod').value;
         const users = parseInt(document.getElementById('endpointUsers').value) || 10;
-        const requests = parseInt(document.getElementById('endpointRequests').value) || 100;
-        const duration = parseInt(document.getElementById('endpointDuration').value) || null;
+        const testMode = document.getElementById('endpointTestMode').value;
+        const requests = testMode === 'requests' ? (parseInt(document.getElementById('endpointRequests').value) || 100) : null;
+        const duration = testMode === 'duration' ? (parseInt(document.getElementById('endpointDuration').value) || 30) : null;
         const contentType = document.getElementById('endpointContentType').value;
-        const body = document.getElementById('endpointBody').value || null;
+        const body = await getBodyContent('endpoint');
         const insecure = document.getElementById('endpointInsecure').checked;
         const requiresAuth = document.getElementById('endpointRequiresAuth').checked;
         
@@ -325,7 +397,7 @@ class NFuryApp {
         });
         
         if (!name || !url) {
-            alert('Please fill in required fields (Name and URL)');
+            this.showAlert('warning', 'Validation Error', 'Please fill in required fields (Name and URL)');
             return;
         }
         
@@ -363,12 +435,13 @@ class NFuryApp {
                 closeEndpointModal();
                 this.expandedProjects.add(this.editingEndpointProjectId);
                 await this.loadProjects();
+                this.showToast('success', 'Success', this.editingEndpointId ? 'Endpoint updated' : 'Endpoint created');
             } else {
                 throw new Error('Failed to save endpoint');
             }
         } catch (err) {
             console.error('Failed to save endpoint:', err);
-            alert('Failed to save endpoint: ' + err.message);
+            this.showAlert('error', 'Error', 'Failed to save endpoint: ' + err.message);
         }
     }
 
@@ -379,7 +452,7 @@ class NFuryApp {
             await fetch(`/api/endpoints/${endpointId}`, { method: 'DELETE' });
             if (this.selectedEndpointId === endpointId) {
                 this.selectedEndpointId = null;
-                document.getElementById('projectNameHeader').textContent = 'Quick Test';
+                document.getElementById('projectNameHeader').textContent = 'Load Test';
                 selectQuickTest();
             }
             await this.loadProjects();
@@ -390,11 +463,21 @@ class NFuryApp {
 
     async runEndpointTest(endpointId) {
         if (this.isRunning) {
-            alert('A test is already running');
+            this.showAlert('warning', 'Test Running', 'A test is already running. Please wait for it to complete.');
             return;
         }
 
         try {
+            const endpointResponse = await fetch(`/api/endpoints/${endpointId}`);
+            if (!endpointResponse.ok) {
+                throw new Error('Failed to fetch endpoint details');
+            }
+            const endpoint = await endpointResponse.json();
+            
+            document.getElementById('infoUsers').textContent = endpoint.users + ' VUs';
+            document.getElementById('infoRequests').textContent = endpoint.requests ? endpoint.requests + ' reqs' : '--';
+            document.getElementById('infoDuration').textContent = endpoint.duration ? endpoint.duration + 's' : '--';
+
             this.resetCharts();
             this.toggleButtons(true);
             this.updateTestStatus('running');
@@ -420,7 +503,7 @@ class NFuryApp {
             }
         } catch (err) {
             console.error('Error starting test:', err);
-            alert('Failed to start test: ' + err.message);
+            this.showAlert('error', 'Test Failed', 'Failed to start test: ' + err.message);
             this.toggleButtons(false);
             this.updateTestStatus('idle');
         }
@@ -497,7 +580,7 @@ class NFuryApp {
             }
         } catch (err) {
             console.error('Failed to create project:', err);
-            alert('Failed to create project: ' + err.message);
+            this.showAlert('error', 'Error', 'Failed to create project: ' + err.message);
             return null;
         }
     }
@@ -509,7 +592,7 @@ class NFuryApp {
             await fetch(`/api/projects/${projectId}`, { method: 'DELETE' });
             if (this.selectedProjectId === projectId) {
                 this.selectedProjectId = null;
-                document.getElementById('projectNameHeader').textContent = 'Quick Test';
+                document.getElementById('projectNameHeader').textContent = 'Load Test';
             }
             await this.loadProjects();
         } catch (err) {
@@ -550,7 +633,7 @@ class NFuryApp {
             document.getElementById('overlay').classList.add('visible');
         } catch (err) {
             console.error('Failed to load project:', err);
-            alert('Failed to load project');
+            this.showAlert('error', 'Error', 'Failed to load project');
         }
     }
     
@@ -573,7 +656,7 @@ class NFuryApp {
         });
         
         if (!url) {
-            alert('Please enter the authentication URL');
+            this.showAlert('warning', 'Validation Error', 'Please enter the authentication URL');
             return;
         }
         
@@ -598,12 +681,13 @@ class NFuryApp {
             if (response.ok) {
                 closeAllModals();
                 await this.loadProjects();
+                this.showToast('success', 'Success', 'Authentication configuration saved');
             } else {
                 throw new Error('Failed to save authentication configuration');
             }
         } catch (err) {
             console.error('Failed to save auth config:', err);
-            alert('Failed to save authentication configuration: ' + err.message);
+            this.showAlert('error', 'Error', 'Failed to save authentication configuration: ' + err.message);
         }
     }
     
@@ -623,7 +707,7 @@ class NFuryApp {
             }
         } catch (err) {
             console.error('Failed to delete auth config:', err);
-            alert('Failed to delete authentication configuration: ' + err.message);
+            this.showAlert('error', 'Error', 'Failed to delete authentication configuration: ' + err.message);
         }
     }
 
@@ -973,6 +1057,34 @@ class NFuryApp {
         });
     }
 
+    toggleQuickTestMode() {
+        const mode = document.getElementById('testMode').value;
+        const requestsGroup = document.getElementById('requestsGroup');
+        const durationGroup = document.getElementById('durationGroup');
+        
+        if (mode === 'requests') {
+            requestsGroup.style.display = 'block';
+            durationGroup.style.display = 'none';
+        } else {
+            requestsGroup.style.display = 'none';
+            durationGroup.style.display = 'block';
+        }
+    }
+
+    toggleEndpointTestMode() {
+        const mode = document.getElementById('endpointTestMode').value;
+        const requestsGroup = document.getElementById('endpointRequestsGroup');
+        const durationGroup = document.getElementById('endpointDurationGroup');
+        
+        if (mode === 'requests') {
+            requestsGroup.style.display = 'block';
+            durationGroup.style.display = 'none';
+        } else {
+            requestsGroup.style.display = 'none';
+            durationGroup.style.display = 'block';
+        }
+    }
+
     async connectSignalR() {
         this.connection = new signalR.HubConnectionBuilder()
             .withUrl('/hubs/loadtest')
@@ -1068,10 +1180,10 @@ class NFuryApp {
     }
 
     async startTest() {
-        const request = this.buildRequest();
+        const request = await this.buildRequest();
         
         if (!request.url) {
-            alert('Please enter a valid URL');
+            this.showAlert('warning', 'Validation Error', 'Please enter a valid URL');
             return;
         }
 
@@ -1088,11 +1200,11 @@ class NFuryApp {
                     const endpointName = document.getElementById('endpointName').value;
                     
                     if (!projectId) {
-                        alert('Please select a project');
+                        this.showAlert('warning', 'Validation Error', 'Please select a project');
                         return;
                     }
                     if (!endpointName) {
-                        alert('Please enter an endpoint name');
+                        this.showAlert('warning', 'Validation Error', 'Please enter an endpoint name');
                         return;
                     }
                     
@@ -1116,11 +1228,11 @@ class NFuryApp {
                     const endpointName = document.getElementById('newEndpointName').value;
                     
                     if (!projectName) {
-                        alert('Please enter a project name');
+                        this.showAlert('warning', 'Validation Error', 'Please enter a project name');
                         return;
                     }
                     if (!endpointName) {
-                        alert('Please enter an endpoint name');
+                        this.showAlert('warning', 'Validation Error', 'Please enter an endpoint name');
                         return;
                     }
                     
@@ -1155,7 +1267,7 @@ class NFuryApp {
                 
             } catch (err) {
                 console.error('Error saving to project:', err);
-                alert('Failed to save to project: ' + err.message);
+                this.showAlert('error', 'Error', 'Failed to save to project: ' + err.message);
                 return;
             }
         }
@@ -1167,7 +1279,8 @@ class NFuryApp {
         this.peakRps = 0;
 
         document.getElementById('infoUsers').textContent = request.users + ' VUs';
-        document.getElementById('infoDuration').textContent = request.duration ? request.duration + 's' : request.requests + ' reqs';
+        document.getElementById('infoRequests').textContent = request.requests ? request.requests + ' reqs' : '--';
+        document.getElementById('infoDuration').textContent = request.duration ? request.duration + 's' : '--';
         document.getElementById('infoDate').textContent = this.startTime.toLocaleDateString('en-US', {
             day: 'numeric',
             month: 'short',
@@ -1206,7 +1319,7 @@ class NFuryApp {
             }
         } catch (err) {
             console.error('Error starting test:', err);
-            alert('Failed to start test: ' + err.message);
+            this.showAlert('error', 'Test Failed', 'Failed to start test: ' + err.message);
             this.toggleButtons(false);
             this.updateTestStatus('idle');
         }
@@ -1248,9 +1361,9 @@ class NFuryApp {
         text.textContent = labels[status] || status;
     }
 
-    buildRequest() {
+    async buildRequest() {
         const headers = {};
-        document.querySelectorAll('.header-row').forEach(row => {
+        document.querySelectorAll('#headersContainer .header-row').forEach(row => {
             const key = row.querySelector('.header-key')?.value;
             const value = row.querySelector('.header-value')?.value;
             if (key && value) {
@@ -1258,17 +1371,18 @@ class NFuryApp {
             }
         });
 
-        const durationValue = document.getElementById('duration').value;
+        const testMode = document.getElementById('testMode').value;
         const useAuth = document.getElementById('useAuth').checked;
+        const body = await getBodyContent('quick');
         
         const request = {
             url: this.getFullUrl('urlSchema', 'url'),
             method: document.getElementById('method').value,
             users: parseInt(document.getElementById('users').value) || 10,
-            requests: durationValue ? null : (parseInt(document.getElementById('requests').value) || 100),
-            duration: durationValue ? parseInt(durationValue) : null,
+            requests: testMode === 'requests' ? (parseInt(document.getElementById('requests').value) || 100) : null,
+            duration: testMode === 'duration' ? (parseInt(document.getElementById('duration').value) || 30) : null,
             contentType: document.getElementById('contentType').value,
-            body: document.getElementById('body').value || null,
+            body: body,
             insecure: document.getElementById('insecure').checked,
             headers: Object.keys(headers).length > 0 ? headers : null
         };
@@ -1354,6 +1468,8 @@ class NFuryApp {
         this.toggleButtons(false);
         this.updateTestStatus('completed');
         console.log('Status updated to completed');
+        
+        this.showToast('success', 'Test Completed', `${result.totalRequests.toLocaleString()} requests at ${result.requestsPerSecond.toFixed(1)} req/s`);
 
         document.getElementById('statTotalRequests').textContent = this.formatNumber(result.totalRequests);
         document.getElementById('statFailed').textContent = this.formatNumber(result.failedRequests);
@@ -1427,7 +1543,7 @@ class NFuryApp {
         this.isRunning = false;
         this.toggleButtons(false);
         this.updateTestStatus('idle');
-        alert('Test error: ' + error.error);
+        this.showAlert('error', 'Test Error', error.error);
     }
 
     resetCharts() {
@@ -1503,16 +1619,7 @@ function initSidebarResize() {
         newWidth = Math.max(180, Math.min(400, newWidth));
         
         sidebar.style.width = newWidth + 'px';
-        
         document.documentElement.style.setProperty('--sidebar-width', newWidth + 'px');
-        
-        const mainContent = document.querySelector('.main-content.with-sidebar');
-        const testInfoBar = document.querySelector('.test-info-bar');
-        
-        if (document.body.classList.contains('sidebar-open')) {
-            if (mainContent) mainContent.style.marginLeft = newWidth + 'px';
-            if (testInfoBar) testInfoBar.style.left = newWidth + 'px';
-        }
     });
 
     document.addEventListener('mouseup', () => {
@@ -1532,12 +1639,7 @@ function initSidebarResize() {
         const width = parseInt(savedWidth);
         if (width >= 180 && width <= 400) {
             sidebar.style.width = width + 'px';
-            if (document.body.classList.contains('sidebar-open')) {
-                const mainContent = document.querySelector('.main-content.with-sidebar');
-                const testInfoBar = document.querySelector('.test-info-bar');
-                if (mainContent) mainContent.style.marginLeft = width + 'px';
-                if (testInfoBar) testInfoBar.style.left = width + 'px';
-            }
+            document.documentElement.style.setProperty('--sidebar-width', width + 'px');
         }
     }
 }
@@ -1602,7 +1704,7 @@ function selectQuickTest() {
     window.app.selectedProjectId = null;
     window.app.selectedEndpointId = null;
     window.app.renderProjectList();
-    document.getElementById('projectNameHeader').textContent = 'Quick Test';
+    document.getElementById('projectNameHeader').textContent = 'Load Test';
     
     document.getElementById('urlSchema').value = 'https://';
     document.getElementById('url').value = '';
@@ -1733,7 +1835,7 @@ async function importProject() {
         }
         await window.app.loadProjects();
         
-        alert(`Project imported successfully!\n\n• Project: ${result.projectName}\n• Endpoints: ${result.endpointsImported}\n• Executions: ${result.executionsImported}`);
+        window.app.showAlert('success', 'Import Successful', `Project "${result.projectName}" imported with ${result.endpointsImported} endpoints and ${result.executionsImported} executions.`);
     } catch (err) {
         showImportError(err.message);
         btn.innerHTML = originalText;
@@ -1759,8 +1861,9 @@ async function exportProject(projectId, projectName) {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+        window.app.showToast('success', 'Export Complete', `Project "${projectName}" exported successfully`);
     } catch (err) {
-        alert('Export failed: ' + err.message);
+        window.app.showAlert('error', 'Export Failed', err.message);
     }
 }
 
@@ -1769,7 +1872,7 @@ async function createProject() {
     const description = document.getElementById('newProjectDescription').value;
     
     if (!name) {
-        alert('Please enter a project name');
+        window.app.showAlert('warning', 'Validation Error', 'Please enter a project name');
         return;
     }
     
@@ -1782,6 +1885,7 @@ async function createProject() {
         closeCreateProjectModal();
         window.app.expandedProjects.add(project.id);
         await window.app.loadProjects();
+        window.app.showToast('success', 'Success', `Project "${name}" created`);
     }
 }
 
@@ -1834,6 +1938,124 @@ function selectProjectTab(tab) {
 function toggleProjectNameInput() {
     toggleProjectSaveOptions();
 }
+
+let quickBodyFile = null;
+let endpointBodyFile = null;
+
+function toggleBodySource(context, source) {
+    const prefix = context === 'quick' ? '' : 'endpoint';
+    const textSection = document.getElementById(prefix ? `${prefix}BodyTextSection` : 'bodyTextSection');
+    const fileSection = document.getElementById(prefix ? `${prefix}BodyFileSection` : 'bodyFileSection');
+    const buttons = textSection.parentElement.querySelectorAll('.body-source-btn');
+    
+    buttons.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.source === source);
+    });
+    
+    if (source === 'text') {
+        textSection.classList.remove('hidden');
+        fileSection.classList.add('hidden');
+    } else {
+        textSection.classList.add('hidden');
+        fileSection.classList.remove('hidden');
+    }
+}
+
+function handleBodyFileSelect(context, input) {
+    const file = input.files[0];
+    if (!file) return;
+    
+    const prefix = context === 'quick' ? '' : 'endpoint';
+    const fileNameSpan = document.getElementById(prefix ? `${prefix}BodyFileName` : 'bodyFileName');
+    const dropZone = document.getElementById(prefix ? `${prefix}BodyFileDropZone` : 'bodyFileDropZone');
+    
+    if (context === 'quick') {
+        quickBodyFile = file;
+    } else {
+        endpointBodyFile = file;
+    }
+    
+    fileNameSpan.textContent = `${file.name} (${formatFileSize(file.size)})`;
+    dropZone.classList.add('has-file');
+}
+
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function clearBodyFile(context) {
+    const prefix = context === 'quick' ? '' : 'endpoint';
+    const fileInput = document.getElementById(prefix ? `${prefix}BodyFile` : 'bodyFile');
+    const fileNameSpan = document.getElementById(prefix ? `${prefix}BodyFileName` : 'bodyFileName');
+    const dropZone = document.getElementById(prefix ? `${prefix}BodyFileDropZone` : 'bodyFileDropZone');
+    
+    if (context === 'quick') {
+        quickBodyFile = null;
+    } else {
+        endpointBodyFile = null;
+    }
+    
+    fileInput.value = '';
+    fileNameSpan.textContent = 'Click or drag file here';
+    dropZone.classList.remove('has-file');
+}
+
+async function getBodyContent(context) {
+    const prefix = context === 'quick' ? '' : 'endpoint';
+    const textSection = document.getElementById(prefix ? `${prefix}BodyTextSection` : 'bodyTextSection');
+    const isTextMode = !textSection.classList.contains('hidden');
+    
+    if (isTextMode) {
+        const textarea = document.getElementById(prefix ? `${prefix}Body` : 'body');
+        return textarea.value || null;
+    } else {
+        const file = context === 'quick' ? quickBodyFile : endpointBodyFile;
+        if (!file) return null;
+        
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.readAsText(file);
+        });
+    }
+}
+
+function initBodyFileDragDrop() {
+    ['bodyFileDropZone', 'endpointBodyFileDropZone'].forEach(id => {
+        const dropZone = document.getElementById(id);
+        if (!dropZone) return;
+        
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+        
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-over');
+        });
+        
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                const context = id === 'bodyFileDropZone' ? 'quick' : 'endpoint';
+                const input = document.getElementById(context === 'quick' ? 'bodyFile' : 'endpointBodyFile');
+                
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                input.files = dt.files;
+                
+                handleBodyFileSelect(context, input);
+            }
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', initBodyFileDragDrop);
 
 function addHeader() {
     const container = document.getElementById('headersContainer');
@@ -1926,6 +2148,10 @@ async function testAuthentication() {
     } catch (err) {
         authStatus.innerHTML = `<div class="auth-error"><i class="fas fa-times-circle"></i> ${err.message}</div>`;
     }
+}
+
+function closeAlertModal() {
+    window.app.closeAlertModal();
 }
 
 document.addEventListener('DOMContentLoaded', () => {

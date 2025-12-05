@@ -2,7 +2,7 @@
   "profiles": {
     "NFury": {
       "commandName": "Project",
-      "commandLineArgs": "run -u 10 -d 30 http://localhost:5205/todos"
+      "commandLineArgs": "server"
     }
   }
 }

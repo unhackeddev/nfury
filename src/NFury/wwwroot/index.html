@@ -22,7 +22,7 @@
             </div>
             <div class="header-divider"></div>
             <div class="test-info">
-                <span class="test-name" id="projectNameHeader">Quick Test</span>
+                <span class="test-name" id="projectNameHeader">Load Test</span>
                 <span class="test-subtitle">Dashboard</span>
             </div>
         </div>
@@ -49,6 +49,10 @@
         <div class="info-item">
             <i class="fas fa-users"></i>
             <span id="infoUsers">10 VUs</span>
+        </div>
+        <div class="info-item">
+            <i class="fas fa-bullseye"></i>
+            <span id="infoRequests">--</span>
         </div>
         <div class="info-item">
             <i class="fas fa-clock"></i>
@@ -92,7 +96,7 @@
         <aside class="config-panel" id="configPanel">
             <div class="config-header">
                 <div class="config-title">
-                    <span class="config-name"><i class="fas fa-sliders-h"></i> Quick Test</span>
+                    <span class="config-name"><i class="fas fa-sliders-h"></i> Load Test</span>
                     <span class="config-subtitle">Test Configuration</span>
                 </div>
                 <button class="btn-close-config" onclick="toggleConfigPanel()">
@@ -139,19 +143,42 @@
                             <input type="number" id="users" value="10" min="1" max="1000">
                         </div>
                         <div class="form-group">
-                            <label for="requests"><i class="fas fa-exchange-alt"></i> Requests</label>
+                            <label for="testMode"><i class="fas fa-sliders-h"></i> Test Mode</label>
+                            <select id="testMode" onchange="window.app.toggleQuickTestMode()">
+                                <option value="requests">By Requests</option>
+                                <option value="duration">By Duration</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="requestsGroup">
+                            <label for="requests"><i class="fas fa-bullseye"></i> Requests</label>
                             <input type="number" id="requests" value="100" min="1">
+                        </div>
+                        <div class="form-group" id="durationGroup" style="display: none;">
+                            <label for="duration"><i class="fas fa-stopwatch"></i> Duration (sec)</label>
+                            <input type="number" id="duration" value="30" min="1">
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="duration"><i class="fas fa-stopwatch"></i> Duration (seconds)</label>
-                        <input type="number" id="duration" placeholder="Leave empty for request-based">
-                    </div>
-
                     <div class="form-group" id="bodySection">
-                        <label for="body">Request Body</label>
-                        <textarea id="body" rows="3" placeholder='{"key": "value"}'></textarea>
+                        <label>Request Body</label>
+                        <div class="body-source-toggle">
+                            <button type="button" class="body-source-btn active" data-source="text" onclick="toggleBodySource('quick', 'text')">
+                                <i class="fas fa-code"></i> Text
+                            </button>
+                            <button type="button" class="body-source-btn" data-source="file" onclick="toggleBodySource('quick', 'file')">
+                                <i class="fas fa-file-upload"></i> File
+                            </button>
+                        </div>
+                        <div id="bodyTextSection">
+                            <textarea id="body" rows="3" placeholder='{"key": "value"}'></textarea>
+                        </div>
+                        <div id="bodyFileSection" class="hidden">
+                            <div class="file-upload-area" id="bodyFileDropZone" onclick="document.getElementById('bodyFile').click()">
+                                <input type="file" id="bodyFile" style="display: none" onchange="handleBodyFileSelect('quick', this)">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <span id="bodyFileName">Click or drag file here</span>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -481,12 +508,19 @@
                             <input type="number" id="endpointUsers" value="10" min="1">
                         </div>
                         <div class="form-group">
+                            <label for="endpointTestMode">Test Mode</label>
+                            <select id="endpointTestMode" onchange="window.app.toggleEndpointTestMode()">
+                                <option value="requests">By Requests</option>
+                                <option value="duration">By Duration</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="endpointRequestsGroup">
                             <label for="endpointRequests">Total Requests</label>
                             <input type="number" id="endpointRequests" value="100" min="1">
                         </div>
-                        <div class="form-group">
+                        <div class="form-group" id="endpointDurationGroup" style="display: none;">
                             <label for="endpointDuration">Duration (sec)</label>
-                            <input type="number" id="endpointDuration" placeholder="Optional" min="1">
+                            <input type="number" id="endpointDuration" value="30" min="1">
                         </div>
                     </div>
                     <div class="form-row">
@@ -502,8 +536,25 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="endpointBody">Request Body</label>
-                        <textarea id="endpointBody" rows="4" placeholder='{"key": "value"}'></textarea>
+                        <label>Request Body</label>
+                        <div class="body-source-toggle">
+                            <button type="button" class="body-source-btn active" data-source="text" onclick="toggleBodySource('endpoint', 'text')">
+                                <i class="fas fa-code"></i> Text
+                            </button>
+                            <button type="button" class="body-source-btn" data-source="file" onclick="toggleBodySource('endpoint', 'file')">
+                                <i class="fas fa-file-upload"></i> File
+                            </button>
+                        </div>
+                        <div id="endpointBodyTextSection">
+                            <textarea id="endpointBody" rows="3" placeholder='{"key": "value"}'></textarea>
+                        </div>
+                        <div id="endpointBodyFileSection" class="hidden">
+                            <div class="file-upload-area" id="endpointBodyFileDropZone" onclick="document.getElementById('endpointBodyFile').click()">
+                                <input type="file" id="endpointBodyFile" style="display: none" onchange="handleBodyFileSelect('endpoint', this)">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <span id="endpointBodyFileName">Click or drag file here</span>
+                            </div>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>Headers <button type="button" class="btn-add-header" onclick="addEndpointHeader()"><i class="fas fa-plus"></i></button></label>
@@ -673,6 +724,25 @@
     </div>
 
     <div class="overlay" id="overlay" onclick="closeAllModals()"></div>
+
+    <!-- Toast Notifications Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Alert Modal -->
+    <div id="alertModal" class="alert-modal">
+        <div class="alert-modal-content">
+            <div class="alert-modal-header" id="alertModalHeader">
+                <i class="fas fa-exclamation-triangle" id="alertModalIcon"></i>
+            </div>
+            <div class="alert-modal-body">
+                <h3 id="alertModalTitle">Error</h3>
+                <p id="alertModalMessage">An error occurred</p>
+            </div>
+            <div class="alert-modal-footer">
+                <button class="btn-alert-close" onclick="window.app.closeAlertModal()">OK</button>
+            </div>
+        </div>
+    </div>
 
     <script src="js/app.js"></script>
 </body>
