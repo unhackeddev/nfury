@@ -10,7 +10,7 @@ We release patches for security vulnerabilities. Which versions are eligible for
 
 ## Reporting a Vulnerability
 
-Please report (suspected) security vulnerabilities to **[security@unhacked.dev](mailto:security@unhacked.dev)**. You will receive a response from us within 48 hours. If the issue is confirmed, we will release a patch as soon as possible depending on complexity but historically within a few days.
+Please report (suspected) security vulnerabilities to **[info@unhacked.dev](mailto:info@unhacked.dev)**. You will receive a response from us within 48 hours. If the issue is confirmed, we will release a patch as soon as possible depending on complexity but historically within a few days.
 
 Please do not report security vulnerabilities through public GitHub issues.
 
