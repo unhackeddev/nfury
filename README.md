@@ -111,6 +111,17 @@ For security concerns, please see our [Security Policy](SECURITY.md).
 -   CLI powered by [Spectre.Console](https://spectreconsole.net/)
 -   Real-time updates with [SignalR](https://docs.microsoft.com/aspnet/signalr)
 
+
+## ☕ Support
+
+If you find NFury useful and want to support its development, consider buying me a coffee!
+
+<p align="center">
+  <a href="https://buymeacoffee.com/cristianorodrigues">
+    <img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=☕&slug=cristianorodrigues&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Buy Me A Coffee">
+  </a>
+</p>
+
 ---
 
 Made with ❤️ by [Unhacked](https://github.com/unhackeddev)
