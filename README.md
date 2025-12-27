@@ -116,11 +116,7 @@ For security concerns, please see our [Security Policy](SECURITY.md).
 
 If you find NFury useful and want to support its development, consider buying me a coffee!
 
-<p align="center">
-  <a href="https://buymeacoffee.com/cristianorodrigues">
-    <img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=☕&slug=cristianorodrigues&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Buy Me A Coffee">
-  </a>
-</p>
+[![Buy Me a Coffee](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/cristianorodrigues)
 
 ---
 
