@@ -697,6 +697,119 @@ public class ExecutionService
             ErrorMessage = reader.IsDBNull(25) ? null : reader.GetString(25)
         };
     }
+
+    /// <summary>
+    /// Compares two test executions and calculates performance delta
+    /// </summary>
+    /// <param name="baselineId">The baseline execution ID</param>
+    /// <param name="compareId">The execution ID to compare against baseline</param>
+    /// <returns>The comparison result or null if either execution is not found</returns>
+    public async Task<ExecutionComparisonResult?> CompareExecutionsAsync(int baselineId, int compareId)
+    {
+        var baseline = await GetExecutionByIdAsync(baselineId);
+        var compare = await GetExecutionByIdAsync(compareId);
+
+        if (baseline == null || compare == null)
+            return null;
+
+        var baselineSummary = new ExecutionSummary
+        {
+            Id = baseline.Id,
+            TestId = baseline.TestId,
+            EndpointName = baseline.Endpoint?.Name,
+            Url = baseline.Url,
+            StartedAt = baseline.StartedAt,
+            TotalRequests = baseline.TotalRequests,
+            FailedRequests = baseline.FailedRequests,
+            RequestsPerSecond = baseline.RequestsPerSecond,
+            AverageResponseTime = baseline.AverageResponseTime,
+            MinResponseTime = baseline.MinResponseTime,
+            MaxResponseTime = baseline.MaxResponseTime,
+            Percentile50 = baseline.Percentile50,
+            Percentile90 = baseline.Percentile90,
+            Percentile95 = baseline.Percentile95,
+            Percentile99 = baseline.Percentile99
+        };
+
+        var compareSummary = new ExecutionSummary
+        {
+            Id = compare.Id,
+            TestId = compare.TestId,
+            EndpointName = compare.Endpoint?.Name,
+            Url = compare.Url,
+            StartedAt = compare.StartedAt,
+            TotalRequests = compare.TotalRequests,
+            FailedRequests = compare.FailedRequests,
+            RequestsPerSecond = compare.RequestsPerSecond,
+            AverageResponseTime = compare.AverageResponseTime,
+            MinResponseTime = compare.MinResponseTime,
+            MaxResponseTime = compare.MaxResponseTime,
+            Percentile50 = compare.Percentile50,
+            Percentile90 = compare.Percentile90,
+            Percentile95 = compare.Percentile95,
+            Percentile99 = compare.Percentile99
+        };
+
+        var rpsDelta = compare.RequestsPerSecond - baseline.RequestsPerSecond;
+        var avgResponseDelta = compare.AverageResponseTime - baseline.AverageResponseTime;
+        var p50Delta = compare.Percentile50 - baseline.Percentile50;
+        var p90Delta = compare.Percentile90 - baseline.Percentile90;
+        var p95Delta = compare.Percentile95 - baseline.Percentile95;
+        var p99Delta = compare.Percentile99 - baseline.Percentile99;
+
+        var baselineFailureRate = baseline.TotalRequests > 0 ? (double)baseline.FailedRequests / baseline.TotalRequests : 0;
+        var compareFailureRate = compare.TotalRequests > 0 ? (double)compare.FailedRequests / compare.TotalRequests : 0;
+
+        var assessment = DetermineAssessment(rpsDelta, avgResponseDelta, baseline.RequestsPerSecond, baseline.AverageResponseTime);
+
+        var delta = new PerformanceDelta
+        {
+            RpsDelta = rpsDelta,
+            RpsPercentChange = baseline.RequestsPerSecond > 0 ? (rpsDelta / baseline.RequestsPerSecond) * 100 : 0,
+            AvgResponseTimeDelta = avgResponseDelta,
+            AvgResponseTimePercentChange = baseline.AverageResponseTime > 0 ? (avgResponseDelta / baseline.AverageResponseTime) * 100 : 0,
+            MinResponseTimeDelta = compare.MinResponseTime - baseline.MinResponseTime,
+            MaxResponseTimeDelta = compare.MaxResponseTime - baseline.MaxResponseTime,
+            P50Delta = p50Delta,
+            P50PercentChange = baseline.Percentile50 > 0 ? (p50Delta / baseline.Percentile50) * 100 : 0,
+            P90Delta = p90Delta,
+            P90PercentChange = baseline.Percentile90 > 0 ? (p90Delta / baseline.Percentile90) * 100 : 0,
+            P95Delta = p95Delta,
+            P95PercentChange = baseline.Percentile95 > 0 ? (p95Delta / baseline.Percentile95) * 100 : 0,
+            P99Delta = p99Delta,
+            P99PercentChange = baseline.Percentile99 > 0 ? (p99Delta / baseline.Percentile99) * 100 : 0,
+            FailureRateDelta = (compareFailureRate - baselineFailureRate) * 100,
+            Assessment = assessment
+        };
+
+        return new ExecutionComparisonResult
+        {
+            Baseline = baselineSummary,
+            Compare = compareSummary,
+            Delta = delta
+        };
+    }
+
+    private static string DetermineAssessment(double rpsDelta, double avgResponseDelta, double baselineRps, double baselineAvgResponse)
+    {
+        var rpsPercentChange = baselineRps > 0 ? (rpsDelta / baselineRps) * 100 : 0;
+        var responsePercentChange = baselineAvgResponse > 0 ? (avgResponseDelta / baselineAvgResponse) * 100 : 0;
+
+        var rpsImproved = rpsPercentChange > 5;
+        var rpsRegressed = rpsPercentChange < -5;
+        var responseImproved = responsePercentChange < -5;
+        var responseRegressed = responsePercentChange > 5;
+
+        if (rpsImproved && responseImproved)
+            return "Significant Improvement";
+        if (rpsImproved || responseImproved)
+            return "Improvement";
+        if (rpsRegressed && responseRegressed)
+            return "Significant Regression";
+        if (rpsRegressed || responseRegressed)
+            return "Regression";
+        return "No Significant Change";
+    }
 }
 
 /// <summary>

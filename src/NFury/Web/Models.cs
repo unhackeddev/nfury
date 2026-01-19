@@ -440,3 +440,207 @@ public record SignalRTestErrorMessage
     /// </summary>
     public string Error { get; init; } = string.Empty;
 }
+
+/// <summary>
+/// Request to compare two executions
+/// </summary>
+public record ExecutionComparisonRequest
+{
+    /// <summary>
+    /// The ID of the baseline execution
+    /// </summary>
+    public int BaselineExecutionId { get; init; }
+
+    /// <summary>
+    /// The ID of the execution to compare against the baseline
+    /// </summary>
+    public int CompareExecutionId { get; init; }
+}
+
+/// <summary>
+/// Result of comparing two test executions
+/// </summary>
+public record ExecutionComparisonResult
+{
+    /// <summary>
+    /// The baseline execution details
+    /// </summary>
+    public ExecutionSummary Baseline { get; init; } = new();
+
+    /// <summary>
+    /// The comparison execution details
+    /// </summary>
+    public ExecutionSummary Compare { get; init; } = new();
+
+    /// <summary>
+    /// Performance differences between the two executions
+    /// </summary>
+    public PerformanceDelta Delta { get; init; } = new();
+}
+
+/// <summary>
+/// Summary of an execution for comparison purposes
+/// </summary>
+public record ExecutionSummary
+{
+    /// <summary>
+    /// The execution ID
+    /// </summary>
+    public int Id { get; init; }
+
+    /// <summary>
+    /// The test identifier
+    /// </summary>
+    public string TestId { get; init; } = string.Empty;
+
+    /// <summary>
+    /// The endpoint name if linked to an endpoint
+    /// </summary>
+    public string? EndpointName { get; init; }
+
+    /// <summary>
+    /// The target URL tested
+    /// </summary>
+    public string Url { get; init; } = string.Empty;
+
+    /// <summary>
+    /// When the test started
+    /// </summary>
+    public DateTime StartedAt { get; init; }
+
+    /// <summary>
+    /// Total requests made
+    /// </summary>
+    public long TotalRequests { get; init; }
+
+    /// <summary>
+    /// Failed requests count
+    /// </summary>
+    public long FailedRequests { get; init; }
+
+    /// <summary>
+    /// Requests per second
+    /// </summary>
+    public double RequestsPerSecond { get; init; }
+
+    /// <summary>
+    /// Average response time in ms
+    /// </summary>
+    public double AverageResponseTime { get; init; }
+
+    /// <summary>
+    /// Minimum response time in ms
+    /// </summary>
+    public double MinResponseTime { get; init; }
+
+    /// <summary>
+    /// Maximum response time in ms
+    /// </summary>
+    public double MaxResponseTime { get; init; }
+
+    /// <summary>
+    /// 50th percentile response time
+    /// </summary>
+    public double Percentile50 { get; init; }
+
+    /// <summary>
+    /// 90th percentile response time
+    /// </summary>
+    public double Percentile90 { get; init; }
+
+    /// <summary>
+    /// 95th percentile response time
+    /// </summary>
+    public double Percentile95 { get; init; }
+
+    /// <summary>
+    /// 99th percentile response time
+    /// </summary>
+    public double Percentile99 { get; init; }
+}
+
+/// <summary>
+/// Performance difference between two executions
+/// </summary>
+public record PerformanceDelta
+{
+    /// <summary>
+    /// Requests per second difference (positive = improvement)
+    /// </summary>
+    public double RpsDelta { get; init; }
+
+    /// <summary>
+    /// Requests per second percentage change
+    /// </summary>
+    public double RpsPercentChange { get; init; }
+
+    /// <summary>
+    /// Average response time difference (negative = improvement)
+    /// </summary>
+    public double AvgResponseTimeDelta { get; init; }
+
+    /// <summary>
+    /// Average response time percentage change
+    /// </summary>
+    public double AvgResponseTimePercentChange { get; init; }
+
+    /// <summary>
+    /// Minimum response time difference
+    /// </summary>
+    public double MinResponseTimeDelta { get; init; }
+
+    /// <summary>
+    /// Maximum response time difference
+    /// </summary>
+    public double MaxResponseTimeDelta { get; init; }
+
+    /// <summary>
+    /// P50 response time difference
+    /// </summary>
+    public double P50Delta { get; init; }
+
+    /// <summary>
+    /// P50 percentage change
+    /// </summary>
+    public double P50PercentChange { get; init; }
+
+    /// <summary>
+    /// P90 response time difference
+    /// </summary>
+    public double P90Delta { get; init; }
+
+    /// <summary>
+    /// P90 percentage change
+    /// </summary>
+    public double P90PercentChange { get; init; }
+
+    /// <summary>
+    /// P95 response time difference
+    /// </summary>
+    public double P95Delta { get; init; }
+
+    /// <summary>
+    /// P95 percentage change
+    /// </summary>
+    public double P95PercentChange { get; init; }
+
+    /// <summary>
+    /// P99 response time difference
+    /// </summary>
+    public double P99Delta { get; init; }
+
+    /// <summary>
+    /// P99 percentage change
+    /// </summary>
+    public double P99PercentChange { get; init; }
+
+    /// <summary>
+    /// Failure rate difference
+    /// </summary>
+    public double FailureRateDelta { get; init; }
+
+    /// <summary>
+    /// Overall assessment of performance change
+    /// </summary>
+    public string Assessment { get; init; } = string.Empty;
+}
