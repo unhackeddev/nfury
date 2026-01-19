@@ -723,6 +723,69 @@
         </div>
     </div>
 
+    <div class="modal" id="comparisonModal">
+        <div class="modal-content xlarge">
+            <div class="modal-header">
+                <h3>Execution Comparison</h3>
+                <button class="btn-close-modal" onclick="closeComparisonModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="comparisonModalBody">
+                <div class="comparison-selection" id="comparisonSelection">
+                    <p class="comparison-instructions">Select two executions from the same endpoint to compare their performance.</p>
+                    <div class="comparison-selectors">
+                        <div class="comparison-selector">
+                            <label>Baseline Execution</label>
+                            <select id="baselineExecution" onchange="window.app.updateCompareButton()">
+                                <option value="">Select baseline...</option>
+                            </select>
+                        </div>
+                        <div class="comparison-vs">VS</div>
+                        <div class="comparison-selector">
+                            <label>Compare Execution</label>
+                            <select id="compareExecution" onchange="window.app.updateCompareButton()">
+                                <option value="">Select to compare...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn-primary" id="btnCompare" onclick="window.app.executeComparison()" disabled>
+                        Compare Performance
+                    </button>
+                </div>
+                <div class="comparison-results hidden" id="comparisonResults">
+                    <div class="comparison-header">
+                        <div class="comparison-assessment" id="comparisonAssessment"></div>
+                        <button class="btn-secondary" onclick="window.app.showComparisonSelection()">
+                            New Comparison
+                        </button>
+                    </div>
+                    <div class="comparison-grid">
+                        <div class="comparison-column baseline">
+                            <h4>Baseline</h4>
+                            <div class="comparison-meta" id="baselineMeta"></div>
+                            <div class="comparison-metrics" id="baselineMetrics"></div>
+                        </div>
+                        <div class="comparison-column delta">
+                            <h4>Change</h4>
+                            <div class="comparison-meta" id="deltaMeta"></div>
+                            <div class="comparison-delta-metrics" id="deltaMetrics"></div>
+                        </div>
+                        <div class="comparison-column compare">
+                            <h4>Compare</h4>
+                            <div class="comparison-meta" id="compareMeta"></div>
+                            <div class="comparison-metrics" id="compareMetrics"></div>
+                        </div>
+                    </div>
+                    <div class="comparison-percentiles">
+                        <h5>Response Time Percentiles Comparison</h5>
+                        <canvas id="comparisonPercentileChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="overlay" id="overlay" onclick="closeAllModals()"></div>
 
     <!-- Toast Notifications Container -->
