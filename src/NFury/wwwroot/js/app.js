@@ -533,7 +533,14 @@ class NFuryApp {
             if (executions.length === 0) {
                 historyEl.innerHTML = '<div class="history-empty-small">No test history</div>';
             } else {
-                historyEl.innerHTML = executions.map(exec => {
+                let html = `
+                    <div class="history-actions-mini">
+                        <button class="btn-compare-mini" onclick="event.stopPropagation(); window.app.showComparisonModal(${endpointId})" title="Compare executions">
+                            Compare
+                        </button>
+                    </div>
+                `;
+                html += executions.map(exec => {
                     const date = new Date(exec.startedAt);
                     const statusClass = exec.status.toLowerCase();
                     return `
@@ -546,6 +553,7 @@ class NFuryApp {
                         </div>
                     `;
                 }).join('');
+                historyEl.innerHTML = html;
             }
         } else {
             historyEl.style.display = 'none';
@@ -774,6 +782,9 @@ class NFuryApp {
     async showExecutionDetails(executionId) {
         try {
             const response = await fetch(`/api/executions/${executionId}/metrics`);
+            if (!response.ok) {
+                throw new Error(`Failed to load execution: ${response.status}`);
+            }
             const execution = await response.json();
             
             let statusCodes = {};
@@ -831,25 +842,27 @@ class NFuryApp {
             
             if (execution.metrics && execution.metrics.length > 0) {
                 const rtChart = this.charts.responseTime;
-                rtChart.data.labels = execution.metrics.map((_, i) => i);
-                rtChart.data.datasets[0].data = execution.metrics.map(m => m.responseTime);
-                rtChart.data.datasets[1].data = execution.metrics.map(m => m.averageResponseTime);
-                rtChart.update();
+                if (rtChart) {
+                    rtChart.data.labels = execution.metrics.map((_, i) => i);
+                    rtChart.data.datasets[0].data = execution.metrics.map(m => m.responseTime);
+                    rtChart.data.datasets[1].data = execution.metrics.map(m => m.averageResponseTime);
+                    rtChart.update();
+                }
                 
-                const rpsChart = this.charts.rps;
-                rpsChart.data.labels = execution.metrics.map((_, i) => i);
-                rpsChart.data.datasets[0].data = execution.metrics.map(m => m.currentRps);
-                rpsChart.update();
+                // Note: rps chart doesn't exist, skip it
             }
             
-            if (Object.keys(statusCodes).length > 0) {
-                const scChart = this.charts.statusCodes;
+            // Update status code chart (always, even if empty to clear previous data)
+            const scChart = this.charts.statusCode;
+            if (scChart) {
                 const labels = Object.keys(statusCodes);
                 const data = labels.map(code => statusCodes[code].count || 0);
                 
                 scChart.data.labels = labels;
                 scChart.data.datasets[0].data = data;
                 scChart.update();
+            } else {
+                console.warn('statusCode chart not initialized');
             }
             
             this.displayFinalResults(result);
@@ -865,19 +878,270 @@ class NFuryApp {
         return div.innerHTML;
     }
 
-    initCharts() {
-        const rtCtx = document.getElementById('responseTimeChart').getContext('2d');
+    async showComparisonModal(endpointId) {
+        this.comparisonEndpointId = endpointId;
+        this.comparisonChart = null;
         
-        const gradientPurple = rtCtx.createLinearGradient(0, 0, 0, 280);
-        gradientPurple.addColorStop(0, 'rgba(124, 58, 237, 0.3)');
-        gradientPurple.addColorStop(1, 'rgba(124, 58, 237, 0.0)');
+        const modal = document.getElementById('comparisonModal');
+        const overlay = document.getElementById('overlay');
+        const selectionDiv = document.getElementById('comparisonSelection');
+        const resultsDiv = document.getElementById('comparisonResults');
         
-        const gradientCyan = rtCtx.createLinearGradient(0, 0, 0, 280);
-        gradientCyan.addColorStop(0, 'rgba(6, 182, 212, 0.3)');
-        gradientCyan.addColorStop(1, 'rgba(6, 182, 212, 0.0)');
+        selectionDiv.classList.remove('hidden');
+        resultsDiv.classList.add('hidden');
+        
+        const baselineSelect = document.getElementById('baselineExecution');
+        const compareSelect = document.getElementById('compareExecution');
+        
+        baselineSelect.innerHTML = '<option value="">Loading...</option>';
+        compareSelect.innerHTML = '<option value="">Loading...</option>';
+        
+        modal.classList.add('open');
+        overlay.classList.add('visible');
+        
+        try {
+            const response = await fetch(`/api/endpoints/${endpointId}/executions?page=1&pageSize=50`);
+            const data = await response.json();
+            const executions = (data.executions || []).filter(e => e.status === 'Completed');
+            
+            if (executions.length < 2) {
+                baselineSelect.innerHTML = '<option value="">Need at least 2 completed executions</option>';
+                compareSelect.innerHTML = '<option value="">Need at least 2 completed executions</option>';
+                return;
+            }
+            
+            this.comparisonExecutions = executions;
+            
+            const optionsHtml = executions.map(exec => {
+                const date = new Date(exec.startedAt);
+                return `<option value="${exec.id}">${date.toLocaleDateString()} ${date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${exec.requestsPerSecond.toFixed(2)} rps</option>`;
+            }).join('');
+            
+            baselineSelect.innerHTML = '<option value="">Select baseline...</option>' + optionsHtml;
+            compareSelect.innerHTML = '<option value="">Select to compare...</option>' + optionsHtml;
+            
+        } catch (err) {
+            console.error('Failed to load executions for comparison:', err);
+            baselineSelect.innerHTML = '<option value="">Error loading executions</option>';
+            compareSelect.innerHTML = '<option value="">Error loading executions</option>';
+        }
+    }
 
-        this.charts.responseTime = new Chart(rtCtx, {
-            type: 'line',
+    updateCompareButton() {
+        const baseline = document.getElementById('baselineExecution').value;
+        const compare = document.getElementById('compareExecution').value;
+        const btn = document.getElementById('btnCompare');
+        
+        btn.disabled = !baseline || !compare || baseline === compare;
+    }
+
+    async executeComparison() {
+        const baselineId = parseInt(document.getElementById('baselineExecution').value);
+        const compareId = parseInt(document.getElementById('compareExecution').value);
+        
+        if (!baselineId || !compareId) return;
+        
+        try {
+            const response = await fetch('/api/executions/compare', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    baselineExecutionId: baselineId,
+                    compareExecutionId: compareId
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to compare executions');
+            }
+            
+            const result = await response.json();
+            this.displayComparisonResults(result);
+            
+        } catch (err) {
+            console.error('Comparison failed:', err);
+            this.showAlert('error', 'Comparison Failed', err.message);
+        }
+    }
+
+    displayComparisonResults(result) {
+        const selectionDiv = document.getElementById('comparisonSelection');
+        const resultsDiv = document.getElementById('comparisonResults');
+        
+        selectionDiv.classList.add('hidden');
+        resultsDiv.classList.remove('hidden');
+        
+        const assessmentDiv = document.getElementById('comparisonAssessment');
+        const assessmentClass = this.getAssessmentClass(result.delta.assessment);
+        assessmentDiv.className = `comparison-assessment ${assessmentClass}`;
+        assessmentDiv.textContent = result.delta.assessment;
+        
+        document.getElementById('baselineMeta').innerHTML = `
+            <div class="meta-item"><strong>${result.baseline.endpointName || 'Ad-hoc Test'}</strong></div>
+            <div class="meta-item">${new Date(result.baseline.startedAt).toLocaleString()}</div>
+        `;
+        
+        document.getElementById('compareMeta').innerHTML = `
+            <div class="meta-item"><strong>${result.compare.endpointName || 'Ad-hoc Test'}</strong></div>
+            <div class="meta-item">${new Date(result.compare.startedAt).toLocaleString()}</div>
+        `;
+        
+        document.getElementById('deltaMeta').innerHTML = `
+            <div class="meta-item">&nbsp;</div>
+            <div class="meta-item">&nbsp;</div>
+        `;
+        
+        document.getElementById('baselineMetrics').innerHTML = this.renderMetricsColumn(result.baseline);
+        document.getElementById('compareMetrics').innerHTML = this.renderMetricsColumn(result.compare);
+        document.getElementById('deltaMetrics').innerHTML = this.renderDeltaColumn(result.delta);
+        
+        this.renderComparisonChart(result);
+    }
+
+    renderMetricsColumn(summary) {
+        return `
+            <div class="metric-row"><span class="label">Requests/sec</span><span class="value">${summary.requestsPerSecond.toFixed(2)}</span></div>
+            <div class="metric-row"><span class="label">Avg Response</span><span class="value">${summary.averageResponseTime.toFixed(2)} ms</span></div>
+            <div class="metric-row"><span class="label">Min Response</span><span class="value">${summary.minResponseTime.toFixed(2)} ms</span></div>
+            <div class="metric-row"><span class="label">Max Response</span><span class="value">${summary.maxResponseTime.toFixed(2)} ms</span></div>
+            <div class="metric-row"><span class="label">Total Requests</span><span class="value">${summary.totalRequests.toLocaleString()}</span></div>
+            <div class="metric-row"><span class="label">Failed</span><span class="value">${summary.failedRequests.toLocaleString()}</span></div>
+            <div class="metric-row"><span class="label">P50</span><span class="value">${summary.percentile50.toFixed(2)} ms</span></div>
+            <div class="metric-row"><span class="label">P90</span><span class="value">${summary.percentile90.toFixed(2)} ms</span></div>
+            <div class="metric-row"><span class="label">P95</span><span class="value">${summary.percentile95.toFixed(2)} ms</span></div>
+            <div class="metric-row"><span class="label">P99</span><span class="value">${summary.percentile99.toFixed(2)} ms</span></div>
+        `;
+    }
+
+    renderDeltaColumn(delta) {
+        return `
+            <div class="metric-row">${this.formatDelta(delta.rpsDelta, delta.rpsPercentChange, true)}</div>
+            <div class="metric-row">${this.formatDelta(delta.avgResponseTimeDelta, delta.avgResponseTimePercentChange, false)}</div>
+            <div class="metric-row">${this.formatDelta(delta.minResponseTimeDelta, 0, false)}</div>
+            <div class="metric-row">${this.formatDelta(delta.maxResponseTimeDelta, 0, false)}</div>
+            <div class="metric-row"><span class="neutral">-</span></div>
+            <div class="metric-row">${this.formatDelta(delta.failureRateDelta, 0, false)}</div>
+            <div class="metric-row">${this.formatDelta(delta.p50Delta, delta.p50PercentChange, false)}</div>
+            <div class="metric-row">${this.formatDelta(delta.p90Delta, delta.p90PercentChange, false)}</div>
+            <div class="metric-row">${this.formatDelta(delta.p95Delta, delta.p95PercentChange, false)}</div>
+            <div class="metric-row">${this.formatDelta(delta.p99Delta, delta.p99PercentChange, false)}</div>
+        `;
+    }
+
+    formatDelta(value, percent, higherIsBetter) {
+        if (Math.abs(value) < 0.01 && Math.abs(percent) < 0.01) {
+            return '<span class="neutral">-</span>';
+        }
+        
+        const isPositive = value > 0;
+        const isImprovement = higherIsBetter ? isPositive : !isPositive;
+        const className = isImprovement ? 'improved' : 'regressed';
+        const sign = isPositive ? '+' : '';
+        
+        let displayValue = `${sign}${value.toFixed(2)}`;
+        if (Math.abs(percent) >= 0.01) {
+            displayValue += ` (${sign}${percent.toFixed(1)}%)`;
+        }
+        
+        return `<span class="${className}">${displayValue}</span>`;
+    }
+
+    getAssessmentClass(assessment) {
+        if (assessment.includes('Significant Improvement')) return 'excellent';
+        if (assessment.includes('Improvement')) return 'good';
+        if (assessment.includes('Significant Regression')) return 'critical';
+        if (assessment.includes('Regression')) return 'warning';
+        return 'neutral';
+    }
+
+    getAssessmentIcon(assessment) {
+        if (assessment.includes('Improvement')) return 'chart-line';
+        if (assessment.includes('Regression')) return 'chart-line';
+        return 'equals';
+    }
+
+    renderComparisonChart(result) {
+        const ctx = document.getElementById('comparisonPercentileChart').getContext('2d');
+        
+        if (this.comparisonChart) {
+            this.comparisonChart.destroy();
+        }
+        
+        this.comparisonChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['P50', 'P90', 'P95', 'P99'],
+                datasets: [
+                    {
+                        label: 'Baseline',
+                        data: [
+                            result.baseline.percentile50,
+                            result.baseline.percentile90,
+                            result.baseline.percentile95,
+                            result.baseline.percentile99
+                        ],
+                        backgroundColor: 'rgba(124, 58, 237, 0.7)',
+                        borderRadius: 4
+                    },
+                    {
+                        label: 'Compare',
+                        data: [
+                            result.compare.percentile50,
+                            result.compare.percentile90,
+                            result.compare.percentile95,
+                            result.compare.percentile99
+                        ],
+                        backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                        borderRadius: 4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            boxWidth: 12,
+                            padding: 16
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: (value) => value + ' ms'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    showComparisonSelection() {
+        const selectionDiv = document.getElementById('comparisonSelection');
+        const resultsDiv = document.getElementById('comparisonResults');
+        
+        selectionDiv.classList.remove('hidden');
+        resultsDiv.classList.add('hidden');
+    }
+
+    initCharts() {
+        try {
+            const rtCtx = document.getElementById('responseTimeChart').getContext('2d');
+            
+            const gradientPurple = rtCtx.createLinearGradient(0, 0, 0, 280);
+            gradientPurple.addColorStop(0, 'rgba(124, 58, 237, 0.3)');
+            gradientPurple.addColorStop(1, 'rgba(124, 58, 237, 0.0)');
+            
+            const gradientCyan = rtCtx.createLinearGradient(0, 0, 0, 280);
+            gradientCyan.addColorStop(0, 'rgba(6, 182, 212, 0.3)');
+            gradientCyan.addColorStop(1, 'rgba(6, 182, 212, 0.0)');
+
+            this.charts.responseTime = new Chart(rtCtx, {
+                type: 'line',
             data: {
                 labels: [],
                 datasets: [{
@@ -1033,6 +1297,9 @@ class NFuryApp {
                 }
             }
         });
+        } catch (err) {
+            console.error('Error initializing charts:', err);
+        }
     }
 
     bindEvents() {
@@ -2152,6 +2419,18 @@ async function testAuthentication() {
 
 function closeAlertModal() {
     window.app.closeAlertModal();
+}
+
+function closeComparisonModal() {
+    const modal = document.getElementById('comparisonModal');
+    const overlay = document.getElementById('overlay');
+    modal.classList.remove('open');
+    overlay.classList.remove('visible');
+    
+    if (window.app && window.app.comparisonChart) {
+        window.app.comparisonChart.destroy();
+        window.app.comparisonChart = null;
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {

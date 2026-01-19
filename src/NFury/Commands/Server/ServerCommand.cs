@@ -252,6 +252,12 @@ public class ServerCommand : AsyncCommand<ServerSettings>
             return Results.Ok(executions);
         });
 
+        app.MapPost("/api/executions/compare", async (ExecutionComparisonRequest request, ExecutionService service) =>
+        {
+            var result = await service.CompareExecutionsAsync(request.BaselineExecutionId, request.CompareExecutionId);
+            return result != null ? Results.Ok(result) : Results.NotFound(new ErrorResponse("One or both executions not found"));
+        });
+
         AnsiConsole.MarkupLine($"[bold green]NFury Web Server started![/]");
         AnsiConsole.MarkupLine($"[blue]Open your browser at:[/] [link]http://{settings.Host}:{settings.Port}[/]");
         AnsiConsole.MarkupLine($"[dim]Database:[/] {dbPath}");
